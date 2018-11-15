@@ -11,6 +11,9 @@ class DataPreprocess:
     def __init__(self):
         pass
 
+    def read_hasc(self, ):
+        pass
+
     def read_har(self, data_path, split="train"):
 
         n_steps = 128

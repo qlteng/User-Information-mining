@@ -10,7 +10,9 @@ import ModelBuilder
 
 if __name__ == '__main__':
 
-    dataconf = DataConf.DataConf('har', 'recog', 128)  # datasource,type,nsteps
+    # dataconf = DataConf.DataConf('har', 'recog', 128)  # datasource,type,nsteps
+    # dataconf = DataConf.DataConf('wisdm', 'recog', 128)
+    dataconf = DataConf.DataConf('hasc', 'recog', 128)
     process = DataPreprocess.DataPreprocess()
 
     X_train, labels_train = process.read_har(data_path=dataconf.path, split="train")
@@ -29,14 +31,14 @@ if __name__ == '__main__':
     y_valid = process.one_hot(y_valid, dataconf.n_class)
     y_test  = process.one_hot(y_test, dataconf.n_class)
 
-    # cnnconf = ModelConf.ModelConf(dataconf = dataconf, batch_size = 600, learning_rate = 0.0001, epochs = 50)
-    # cnnmodel = ModelBuilder.ModelBuilder(cnnconf, "cnn4_filter2s1_pool2s2")
-    # cnnmodel.train_cnn(x_train, y_train, x_valid, y_valid, figplot = True)
-    # cnnmodel.test(x_test, y_test)
+    cnnconf = ModelConf.ModelConf(dataconf = dataconf, batch_size = 600, learning_rate = 0.0001, epochs = 20)
+    cnnmodel = ModelBuilder.ModelBuilder(cnnconf, "cnn4_filter2s1_pool2s2")
+    cnnmodel.train_cnn(x_train, y_train, x_valid, y_valid, figplot = False)
+    cnnmodel.test(x_test, y_test, ROC = False)
 
-    lstmconf = ModelConf.ModelConf(dataconf = dataconf, batch_size= 600, learning_rate= 0.0001, epochs = 40, lstm_size = 27, lstm_layer = 2)
-    lstmmodel = ModelBuilder.ModelBuilder(lstmconf, "lstm")
-    lstmmodel.train_lstm(x_train, y_train, x_valid, y_valid, figplot = True)
-    lstmmodel.test(x_test, y_test)
+    # lstmconf = ModelConf.ModelConf(dataconf = dataconf, batch_size= 600, learning_rate= 0.0001, epochs = 40, lstm_size = 27, lstm_layer = 2)
+    # lstmmodel = ModelBuilder.ModelBuilder(lstmconf, "lstm")
+    # lstmmodel.train_lstm(x_train, y_train, x_valid, y_valid, figplot = True)
+    # lstmmodel.test(x_test, y_test， ROC = False)
 
 

@@ -5,8 +5,7 @@ import tensorflow as tf
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix
-
+from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score, roc_curve, auc
 
 class ModelBuilder:
 
@@ -16,6 +15,12 @@ class ModelBuilder:
         self.types = modelconf.types
         self.saver = None
         self.modelpath = "../model/%s/%s" % (self.types, modelname)
+        self.output = "../output/%s"%modelname
+
+        self.train_time = 0
+        self.test_time = 0
+        self.train_size = 10
+        self.test_size = 10
 
         self.graph = tf.Graph()
 
@@ -32,6 +37,7 @@ class ModelBuilder:
             self.accuracy = None
             self.initial_state = None
             self.final_state = None
+            self.softmax = None
 
     def train_lstm(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
 
@@ -54,6 +60,7 @@ class ModelBuilder:
 
             logits = tf.layers.dense(outputs[-1], self.conf.n_class, name = 'logits')
             self.logits = logits
+            self.softmax = tf.nn.softmax(self.logits)
             self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = logits, labels = self.labels_))
             # optimizer = tf.train.AdamOptimizer(learning_rate_).minimize(cost) # No grad clipping
             train_op = tf.train.AdamOptimizer(self.learning_rate_)
@@ -96,6 +103,7 @@ class ModelBuilder:
             flat = tf.reshape(max_pool_4, ( -1, self.conf.n_steps * self.conf.n_channels ))
             flat = tf.nn.dropout(flat, keep_prob = self.keep_prob_)
             self.logits = tf.layers.dense(flat, self.conf.n_class)
+            self.softmax = tf.nn.softmax(self.logits)
             self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.logits, labels=self.labels_))
             self.optimizer = tf.train.AdamOptimizer(self.learning_rate_).minimize(self.cost)
             correct_pred = tf.equal(tf.argmax(self.logits, 1), tf.argmax(self.labels_, 1))
@@ -103,7 +111,14 @@ class ModelBuilder:
 
         self.run(Xtrain, Ytrain, Xvalid, Yvalid, None, "cnn", figplot)
 
+    def train_cnn_rnn(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
+        pass
+
+    def train_bilstm(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
+        pass
+
     def run(self, Xtrain, Ytrain, Xvalid, Yvalid, cell, type, figplot = False):
+
 
         validation_acc = []
         validation_loss = []
@@ -113,6 +128,8 @@ class ModelBuilder:
 
         with self.graph.as_default():
             self.saver = tf.train.Saver()
+
+        start_time = datetime.datetime.now()
 
         with tf.Session(graph = self.graph) as sess:
             sess.run(tf.global_variables_initializer())
@@ -186,6 +203,10 @@ class ModelBuilder:
                                 maxvalideacc = np.mean(val_acc_)
                                 self.saver.save(sess, '%s/model.ckpt' % self.modelpath)
                     iteration += 1
+
+        self.train_time = datetime.datetime.now() - start_time
+        self.train_size = len(Xtrain)
+
         if figplot == True:
             self.plot(iteration, train_loss, train_acc, validation_loss, validation_acc)
 
@@ -216,11 +237,14 @@ class ModelBuilder:
         for b in range(0, len(X), batch_size):
             yield X[b:b + batch_size], y[b:b + batch_size]
 
-    def test(self, X_test, y_test):
+    def test(self, X_test, y_test, ROC = False):
 
         test_acc = []
         y_plist = []
         y_truelist = []
+        y_problist = []
+
+        start_time = datetime.datetime.now()
 
         with tf.Session(graph = self.graph) as sess:
 
@@ -230,14 +254,54 @@ class ModelBuilder:
                 feed = { self.inputs_: x_t, self.labels_: y_t, self.keep_prob_: 1 }
                 y_p = tf.argmax(self.logits, 1)
                 y_true = np.argmax(y_t, 1)
-                batch_acc, y_pred = sess.run([self.accuracy, y_p], feed_dict=feed)
+                batch_acc, y_pred, y_pred_prob = sess.run([self.accuracy, y_p, self.softmax], feed_dict=feed)
                 y_plist.extend(y_pred)
                 y_truelist.extend(y_true)
+                y_problist.extend(y_pred_prob)
                 test_acc.append(batch_acc)
 
-            print("Test accuracy: {:.6f}".format(np.mean(test_acc)))
+            self.test_time = datetime.datetime.now() - start_time
+            self.test_size = len(X_test)
+
+            print "train time", self.train_time
+            print "test time", self.test_time
+            print "train size", self.train_size
+            print "test size", self.test_size
+
+            print"Test accuracy: {:.6f}".format(np.mean(test_acc))
             print "Precision", precision_score(y_truelist, y_plist, average='weighted')
             print "Recall", recall_score(y_truelist, y_plist, average='weighted')
             print "f1_score", f1_score(y_truelist, y_plist, average='weighted')
             print "confusion_matrix"
-            print confusion_matrix(y_truelist, y_plist)
+            cf_matrix = confusion_matrix(y_truelist, y_plist)
+            print cf_matrix
+
+            if ROC == True:
+
+                y_prob = np.array(y_problist)
+                fpr, tpr, thresholds = roc_curve(y_truelist, y_prob[:, 1])
+                FAR = 1 - tpr
+                FRR = fpr
+                res = abs(FAR - FRR)
+                EER_index = np.argwhere(res == min(res))
+                EER = (FRR[EER_index][0][0] + FAR[EER_index][0][0]) / 2
+                roc_auc = auc(fpr,tpr)
+                print roc_auc
+                print "FRR", cf_matrix[1][0] / float(sum(cf_matrix[1]))
+                print "FAR", cf_matrix[0][1] / float(sum(cf_matrix[0]))
+                print "EER", EER
+
+                fpr = np.array(fpr)
+                tpr = np.array(tpr)
+                fpr = np.insert(fpr, 0, 0)
+                tpr = np.insert(tpr, 0 ,0)
+
+                plt.plot([0, 1],[0, 1], '--', color = (0.6, 0.6, 0.6))
+                plt.plot(fpr, tpr, 'b-')
+                plt.xlabel("False Positive Rate")
+                plt.ylabel("True Positiove Rate")
+                plt.title("ROC")
+                plt.legend(loc = "lower right")
+                plt.show()
+
+

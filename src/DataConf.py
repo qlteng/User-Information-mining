@@ -3,7 +3,6 @@
 
 class DataConf:
 
-
     def __init__(self, datasource, types, n_steps):
 
         self.datasource = datasource
@@ -20,6 +19,7 @@ class DataConf:
             pass
 
         elif self.datasource == 'hasc':
+
             pass
 
         else:

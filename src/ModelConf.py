@@ -1,5 +1,7 @@
-class ModelConf:
+# coding: utf-8
 
+
+class ModelConf:
 
     def __init__(self, dataconf, batch_size, learning_rate, epochs, lstm_size = 27, lstm_layer = 2):
 
