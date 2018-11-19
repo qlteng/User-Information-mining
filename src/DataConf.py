@@ -1,13 +1,21 @@
 # coding: utf-8
 
+import logging
+LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
+logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
+
 
 class DataConf:
 
-    def __init__(self, datasource, types, n_steps):
+    def __init__(self, datasource, types, n_steps, n_channels, n_class, overlap):
 
         self.datasource = datasource
         self.types = types
         self.n_steps = n_steps
+        self.n_channels = n_channels
+        self.n_class = n_class
+        self.overlap = overlap
+        self.path = None
 
         if self.datasource == "har":
             self.path = '../data/har/'
@@ -20,12 +28,10 @@ class DataConf:
 
         elif self.datasource == 'hasc':
 
-            pass
+            self.path = '../data/hasc'
 
         else:
-            print "Datasource Doesn't Exist!"
+            logging.warning("Datasource doesn't exist!")
             return -1
 
-        if self.types not in ['recog' ,'authen']:
-            print "Types Doesn't Match!"
-            return -1
+        logging.info("Data config succeed")

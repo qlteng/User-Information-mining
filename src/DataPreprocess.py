@@ -1,18 +1,204 @@
 # coding: utf-8
 
 import os
+import json
+import multiprocessing
+import logging
 import pandas as pd
 import numpy as np
-import DataConf
+from sklearn.model_selection import train_test_split
+from utils.mysql_dump import dump_from_mysql
 
+LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
+logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
 
 class DataPreprocess:
 
-    def __init__(self):
-        pass
+    def __init__(self, dataconf, process_num, target, *params, **kwargs):
 
-    def read_hasc(self, ):
-        pass
+        self.target = target
+        self.df = dataconf
+        self.process_num = process_num
+
+        # condition
+        self.phonetype = kwargs.get('phonetype', '')
+        self.phoneposition = kwargs.get('phoneposition', '')
+        self.activity = kwargs.get('activity', '')
+
+    def load_data(self, standard = True):
+
+        global total_data
+        global total_label
+
+        if self.df.datasource == 'har':
+
+            X_train, labels_train = self.read_har(data_path = self.df.path, split = "train")
+            X_test, labels_test = self.read_har(data_path = self.df.path, split = "test")
+
+            logging.info( "Read HAR done!")
+            total_data = np.concatenate((X_train, X_test), axis = 0)
+            total_label = np.concatenate((labels_train, labels_test), axis = 0)
+
+        elif self.df.datasource == 'wisdm':
+
+            pass
+
+        elif self.df.datasource == 'hasc':
+
+            raw_data_path = "../data/hasc/raw_data"
+            if not os.path.exists(raw_data_path):
+                logging.warning("Raw data path %s doesn't exist" % raw_data_path)
+                logging.info("Begin to dump data from mysql")
+                os.mkdir(raw_data_path)
+                dump_from_mysql(raw_data_path)
+                logging.info("Generate and save raw_data at %s!" % raw_data_path)
+            else:
+                logging.info("Load raw data from %s" % raw_data_path)
+
+            condition_path = "%s/condition_data/T_%s_P_%s_A_%s"%(self.df.path, self.phonetype, self.phoneposition, self.activity)
+            if not os.path.exists(condition_path):
+                logging.warning("Condition data path %s doesn't exist" % condition_path)
+                os.makedirs(condition_path)
+
+            segment_data_path = "%s/step%d_overlap%0.1f_class%d_channel%d" %(condition_path, self.df.n_steps, self.df.overlap, self.df.n_class, self.df.n_channels)
+
+            if not os.path.exists(segment_data_path):
+
+                logging.warning("Split data path %s doesn't exist" % segment_data_path)
+                logging.info("Begin to window data with the same size")
+                os.mkdir(segment_data_path)
+                self.para_cut(raw_data_path, segment_data_path, self.df.n_steps, self.df.overlap, self.df.n_class,
+                              self.df.n_channels, self.phonetype, self.phoneposition, self.activity)
+            else:
+                logging.info("Load split data from %s" % segment_data_path)
+
+            logging.info("Cut and save split_data at %s!" % segment_data_path)
+
+            total_data, total_label= self.read_hasc(segment_data_path, self.df.n_channels, self.df.n_steps, self.target, self.df.types)
+            logging.info("Task type is %s and reset target is %s" % (self.df.types, self.target))
+
+        RanSelf = np.random.permutation(total_data.shape[0])
+        total_data = total_data[RanSelf]
+        total_label = total_label[RanSelf]
+
+        x_train, x_test, y_train, y_test = train_test_split(total_data, total_label, test_size = 0.25, random_state = 123)
+        x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size = 0.33, random_state = 456)
+        logging.info("Split train、valid、test set")
+
+        if standard == True:
+            x_train, x_test, x_valid = self.standardize(x_train, x_test, x_valid)
+            logging.info("Standardize Done!")
+
+        return x_train, y_train, x_valid, y_valid, x_test, y_test
+
+    def map2id(self, label, target, types):
+
+        for i in range(len(label)):
+
+            Person, Gender, Height, Weight, Position, Type, Mount, Activity = label[i].split('#')
+
+            if types == 'recog':
+                if target == 'activity':
+                    label[i] = Activity
+                elif target == 'person':
+                    label[i] = Person
+                elif target == 'gender':
+                    label[i] = Gender
+
+            elif types == 'authen':
+                pass
+
+        return label
+
+    def segment(self, index, raw_data_path, segment_data_path, n_steps, overlap, n_class, n_channels, phonetype, phoneposition, activity):
+
+        datafile = "%s/dump_data%d.json" % (raw_data_path, index)
+        labelfile = "%s/dump_label%d.json" % (raw_data_path, index)
+
+        with open(datafile, 'r') as f_data:
+            raw_data = dict(json.load(f_data))
+        with open(labelfile, 'r') as f_label:
+            label = dict(json.load(f_label))
+
+        split_data = np.empty((0, n_steps , n_channels))
+        attr_labels = list()
+
+        for x in raw_data:
+            label[x] = label[x].decode().encode()
+            # filter condition
+            if phonetype != '' and phonetype not in label[x]:
+                continue
+            if phoneposition != '' and phoneposition not in label[x]:
+                continue
+            if activity != '' and activity not in label[x]:
+                continue
+
+            format_data = pd.DataFrame(list(raw_data[x]), columns=['AX', 'AY', 'AZ', 'GX', 'GY', 'GZ'])
+            temp_data = np.empty((0, n_steps, n_channels))
+
+            for (start, end) in self.windows(format_data['AX'], n_steps, overlap):
+                # ax, ay, az, gx, gy, gz = format_data[start : end]
+
+                ax = format_data['AX'][start : end]
+                ay = format_data['AY'][start : end]
+                az = format_data['AZ'][start : end]
+                gx = format_data['GX'][start : end]
+                gy = format_data['GY'][start : end]
+                gz = format_data['GZ'][start : end]
+
+                if (len(format_data['AX'][start:end]) == n_steps):
+                    temp_data = np.vstack([temp_data, np.dstack([ax, ay, az, gx, gy, gz])])
+
+            temp_label = [label[x]] * int(temp_data.shape[0])
+            split_data = np.vstack([split_data, temp_data])
+            attr_labels.extend(temp_label)
+
+        attr_labels = np.array(attr_labels)
+        store_data_file = "%s/split_data%d.npy" % (segment_data_path, index)
+        store_label_file = "%s/split_label%d.npy" % (segment_data_path, index)
+
+        np.save(store_data_file, split_data)
+        np.save(store_label_file, attr_labels)
+
+
+    def windows(self, data, n_steps, overlap):
+        start = 0
+        while start < data.count() - n_steps * overlap:
+            yield start, start + n_steps
+            start += int(n_steps * overlap)
+
+    def para_cut(self, raw_data_path, segment_data_path, n_steps, overlap, n_class, n_channels, phonetype, phoneposition, activity):
+
+        process_num = self.process_num
+        record = []
+        for index in xrange(0, process_num):
+
+            p = multiprocessing.Process(target = self.segment, args=(index, raw_data_path, segment_data_path, n_steps, overlap, n_class, n_channels, phonetype, phoneposition, activity))
+            p.start()
+            record.append(p)
+
+        for process in record:
+            process.join()
+
+    def read_hasc(self, data_path, n_channels, n_steps, target, types):
+
+        X = np.empty((0, n_steps, n_channels))
+        Y = list()
+        for index in range(self.process_num):
+
+            store_data_file = "%s/split_data%d.npy" % (data_path, index)
+            store_label_file = "%s/split_label%d.npy" % (data_path, index)
+
+            temp_data = np.load(store_data_file)
+            X = np.vstack([X, temp_data])
+            temp_label = np.load(store_label_file)
+            temp_label = self.map2id(temp_label, target, types)
+            Y.extend(temp_label)
+
+        Y = np.array(Y)
+        Y = np.asarray(pd.get_dummies(np.array(Y)), dtype=np.int8)
+
+        return X, Y
 
     def read_har(self, data_path, split="train"):
 
@@ -34,15 +220,8 @@ class DataPreprocess:
             X[:, :, i_ch] = dat_.as_matrix()
             i_ch += 1
 
-        return X, labels[0].values
-
-    def one_hot(self, labels, n_class):
-
-        expansion = np.eye(n_class)
-        y = expansion[:, labels - 1].T
-        assert y.shape[1] == n_class, "Wrong number of labels!"
-
-        return y
+        Y =  np.asarray(pd.get_dummies(np.array(labels[0].values)), dtype=np.int8)
+        return X, Y
 
     def standardize(self, train, test, valid):
 
@@ -50,7 +229,6 @@ class DataPreprocess:
         X_vld = (valid - np.mean(valid, axis=0)[None, :, :]) / np.std(valid, axis=0)[None, :, :]
         X_test = (test - np.mean(test, axis=0)[None, :, :]) / np.std(test, axis=0)[None, :, :]
 
-        print "Standardize Done!"
         return X_train, X_test, X_vld
 
 

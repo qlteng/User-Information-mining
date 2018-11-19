@@ -6,6 +6,10 @@ import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score, roc_curve, auc
+import logging
+
+LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
+logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
 
 class ModelBuilder:
 
@@ -14,8 +18,9 @@ class ModelBuilder:
         self.conf = modelconf
         self.types = modelconf.types
         self.saver = None
+        self.modelname = modelname
         self.modelpath = "../model/%s/%s" % (self.types, modelname)
-        self.output = "../output/%s"%modelname
+        self.output = "../output/%s" % modelname
 
         self.train_time = 0
         self.test_time = 0
@@ -61,8 +66,7 @@ class ModelBuilder:
             logits = tf.layers.dense(outputs[-1], self.conf.n_class, name = 'logits')
             self.logits = logits
             self.softmax = tf.nn.softmax(self.logits)
-            self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits = logits, labels = self.labels_))
-            # optimizer = tf.train.AdamOptimizer(learning_rate_).minimize(cost) # No grad clipping
+            self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits = logits, labels = self.labels_))
             train_op = tf.train.AdamOptimizer(self.learning_rate_)
 
             gradients = train_op.compute_gradients(self.cost)
@@ -78,22 +82,22 @@ class ModelBuilder:
 
         with self.graph.as_default():
             # (batch, 128, 9) --> (batch, 64, 18)
-            conv1 = tf.layers.conv1d(inputs = self.inputs_, filters = 18, kernel_size = 2, strides = 1,
+            conv1 = tf.layers.conv1d(inputs = self.inputs_, filters = 2 * self.conf.n_channels, kernel_size = 2, strides = 1,
                                      padding = 'same', activation = tf.nn.relu)
             max_pool_1 = tf.layers.max_pooling1d(inputs = conv1, pool_size = 2, strides = 2, padding = 'same')
 
             # (batch, 64, 18) --> (batch, 32, 36)
-            conv2 = tf.layers.conv1d(inputs = max_pool_1, filters = 36, kernel_size = 2, strides = 1,
+            conv2 = tf.layers.conv1d(inputs = max_pool_1, filters = 4 * self.conf.n_channels, kernel_size = 2, strides = 1,
                                      padding = 'same', activation = tf.nn.relu)
             max_pool_2 = tf.layers.max_pooling1d(inputs = conv2, pool_size = 2, strides = 2, padding = 'same')
 
             # (batch, 32, 36) --> (batch, 16, 72)
-            conv3 = tf.layers.conv1d(inputs = max_pool_2, filters = 72, kernel_size = 2, strides = 1,
+            conv3 = tf.layers.conv1d(inputs = max_pool_2, filters = 8 * self.conf.n_channels, kernel_size = 2, strides = 1,
                                      padding = 'same', activation = tf.nn.relu)
             max_pool_3 = tf.layers.max_pooling1d(inputs = conv3, pool_size = 2, strides = 2, padding = 'same')
 
             # (batch, 16, 72) --> (batch, 8, 144)
-            conv4 = tf.layers.conv1d(inputs=max_pool_3, filters=144, kernel_size=2, strides=1,
+            conv4 = tf.layers.conv1d(inputs=max_pool_3, filters=16 * self.conf.n_channels, kernel_size=2, strides=1,
                                      padding='same', activation=tf.nn.relu)
             max_pool_4 = tf.layers.max_pooling1d(inputs=conv4, pool_size=2, strides=2, padding='same')
 
@@ -104,7 +108,8 @@ class ModelBuilder:
             flat = tf.nn.dropout(flat, keep_prob = self.keep_prob_)
             self.logits = tf.layers.dense(flat, self.conf.n_class)
             self.softmax = tf.nn.softmax(self.logits)
-            self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.logits, labels=self.labels_))
+
+            self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.labels_))
             self.optimizer = tf.train.AdamOptimizer(self.learning_rate_).minimize(self.cost)
             correct_pred = tf.equal(tf.argmax(self.logits, 1), tf.argmax(self.labels_, 1))
             self.accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32), name='accuracy')
@@ -118,7 +123,6 @@ class ModelBuilder:
         pass
 
     def run(self, Xtrain, Ytrain, Xvalid, Yvalid, cell, type, figplot = False):
-
 
         validation_acc = []
         validation_loss = []
@@ -296,7 +300,7 @@ class ModelBuilder:
                 fpr = np.insert(fpr, 0, 0)
                 tpr = np.insert(tpr, 0 ,0)
 
-                plt.plot([0, 1],[0, 1], '--', color = (0.6, 0.6, 0.6))
+                plt.plot([0, 1], [0, 1], '--', color = (0.6, 0.6, 0.6))
                 plt.plot(fpr, tpr, 'b-')
                 plt.xlabel("False Positive Rate")
                 plt.ylabel("True Positiove Rate")
