@@ -56,6 +56,7 @@ class DataPreprocess:
                 logging.info("Load raw data from %s" % raw_data_path)
 
             condition_path = "%s/condition_data/T_%s_P_%s_A_%s"%(self.df.path, self.phonetype, self.phoneposition, self.activity)
+
             if not os.path.exists(condition_path):
                 logging.warning("Condition data path %s doesn't exist" % condition_path)
                 os.makedirs(condition_path)
@@ -69,10 +70,11 @@ class DataPreprocess:
                 os.mkdir(segment_data_path)
                 self.para_cut(raw_data_path, segment_data_path, self.df.n_steps, self.df.overlap, self.df.n_class,
                               self.df.n_channels, self.phonetype, self.phoneposition, self.activity)
+                logging.info("Cut and save split_data at %s!" % segment_data_path)
+
             else:
                 logging.info("Load split data from %s" % segment_data_path)
 
-            logging.info("Cut and save split_data at %s!" % segment_data_path)
 
             total_data, total_label= self.read_hasc(segment_data_path, self.df.n_channels, self.df.n_steps, self.target, self.df.types)
             logging.info("Task type is %s and reset target is %s" % (self.df.types, self.target))
@@ -197,6 +199,7 @@ class DataPreprocess:
 
         Y = np.array(Y)
         Y = np.asarray(pd.get_dummies(np.array(Y)), dtype=np.int8)
+        print Y.shape
 
         return X, Y
 

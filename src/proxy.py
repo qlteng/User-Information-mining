@@ -28,13 +28,14 @@ if __name__ == '__main__':
     # dataconf = DataConf.DataConf('wisdm', 'recog', 128, 3, 6, 0.5)
 
     allconfig = {'datasource': 'hasc', 'types': 'recog', 'n_steps': 128, 'n_channel':6, \
-              'n_class': 6, 'overlap': 0.5, 'target': 'activity', 'process_num' : 40, \
-              'condition' : {'phonetype' : '', 'phoneposition' : '', 'activity' : ''}}
+              'n_class': 6, 'overlap': 1, 'target': 'activity', 'process_num' : 40, \
+              'condition' : {'phonetype' : TerminalType[2], 'phoneposition' : '', 'activity' : ''}}
 
     dataconf = DataConf.DataConf(datasource = allconfig['datasource'], types = allconfig['types'], n_steps = allconfig['n_steps'], \
                                  n_channels = allconfig['n_channel'], n_class = allconfig['n_class'], overlap = allconfig['overlap'])
 
-    process = DataPreprocess.DataPreprocess(dataconf = dataconf, process_num = allconfig['process_num'], target = allconfig['target'])
+    process = DataPreprocess.DataPreprocess(dataconf = dataconf, process_num = allconfig['process_num'], target = allconfig['target'], \
+                                            phonetype = allconfig['condition']['phonetype'], phoneposition = allconfig['condition']['phoneposition'])
 
     x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard = True)
 
@@ -42,14 +43,14 @@ if __name__ == '__main__':
                 allconfig['condition']['phonetype'], allconfig['condition']['phoneposition'], allconfig['condition']['activity'], \
                 allconfig['n_class'], allconfig['n_steps'], allconfig['n_channel'], allconfig['overlap'])
 
-    cnnconf = ModelConf.ModelConf(dataconf = dataconf, batch_size = 600, learning_rate = 0.0001, epochs = 40)
-    cnnmodel = ModelBuilder.ModelBuilder(cnnconf, modelname)
-    cnnmodel.train_cnn(x_train, y_train, x_valid, y_valid, figplot = False)
-    cnnmodel.test(x_test, y_test, ROC = False)
+    # cnnconf = ModelConf.ModelConf(dataconf = dataconf, batch_size = 600, learning_rate = 0.0001, epochs = 100)
+    # cnnmodel = ModelBuilder.ModelBuilder(cnnconf, modelname)
+    # cnnmodel.train_cnn(x_train, y_train, x_valid, y_valid, figplot = False)
+    # cnnmodel.test(x_test, y_test, ROC = False)
 
-    # lstmconf = ModelConf.ModelConf(dataconf = dataconf, batch_size= 600, learning_rate= 0.0001, epochs = 40, lstm_size = 27, lstm_layer = 2)
-    # lstmmodel = ModelBuilder.ModelBuilder(lstmconf, "har_lstm")
-    # lstmmodel.train_lstm(x_train, y_train, x_valid, y_valid, figplot = True)
-    # lstmmodel.test(x_test, y_test, ROC = False)
+    lstmconf = ModelConf.ModelConf(dataconf = dataconf, batch_size= 600, learning_rate= 0.0001, epochs = 40, lstm_size = 27, lstm_layer = 2)
+    lstmmodel = ModelBuilder.ModelBuilder(lstmconf, "har_cnnlstm")
+    lstmmodel.train_cnn_rnn(x_train, y_train, x_valid, y_valid, figplot = True)
+    lstmmodel.test(x_test, y_test, ROC = False)
 
 

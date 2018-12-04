@@ -44,6 +44,44 @@ class ModelBuilder:
             self.final_state = None
             self.softmax = None
 
+    def train_bilstm(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
+
+        with self.graph.as_default():
+            lstm_in = tf.transpose(self.inputs_, [1, 0, 2])  # reshape into (seq_len, N, channels)
+            lstm_in = tf.reshape(lstm_in, [-1, self.conf.n_channels])  # Now (seq_len*N, n_channels)
+            lstm_in = tf.split(lstm_in, self.conf.n_steps, 0)
+            lstm_fw = tf.contrib.rnn.BasicLSTMCell(self.conf.n_steps)
+            lstm_bw = tf.contrib.rnn.BasicLSTMCell(self.conf.n_steps)
+
+            cell_fw = tf.contrib.rnn.DropoutWrapper(cell = lstm_fw, input_keep_prob = 1.0, output_keep_prob = self.keep_prob_)
+            cell_bw = tf.contrib.rnn.DropoutWrapper(cell = lstm_bw, input_keep_prob = 1.0, output_keep_prob = self.keep_prob_)
+            # cell_fw = tf.contrib.rnn.MultiRNNCell([lstm_fw] * lstm_layers, state_is_tuple=True)
+            # cell_bw = tf.contrib.rnn.MultiRNNCell([lstm_bw] * lstm_layers, state_is_tuple=True)
+            initial_state_fw = cell_fw.zero_state(self.conf.batch_size, tf.float32)
+            initial_state_bw = cell_bw.zero_state(self.conf.batch_size, tf.float32)
+
+        with self.graph.as_default():
+            outputs, _, _ = tf.nn.static_bidirectional_rnn(cell_fw, cell_bw, lstm_in, initial_state_fw = initial_state_fw,
+                                                           initial_state_bw = initial_state_bw, dtype = tf.float32)
+            # outputs = tf.layers.dense(outputs[-1], self.conf.n_class, activation = None)
+
+            logits = tf.layers.dense(outputs[-1], self.conf.n_class, name = 'logits')
+            self.logits = logits
+            self.softmax = tf.nn.softmax(self.logits)
+            self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=self.labels_))
+            # Grad clipping
+            train_op = tf.train.AdamOptimizer(self.learning_rate_)
+
+            gradients = train_op.compute_gradients(self.cost)
+            capped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients]
+            self.optimizer = train_op.apply_gradients(capped_gradients)
+
+            correct_pred = tf.equal(tf.argmax(logits, 1), tf.argmax(self.labels_, 1))
+            self.accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32), name='accuracy')
+
+        self.run(Xtrain, Ytrain, Xvalid, Yvalid, None, "bilstm", figplot)
+
+
     def train_lstm(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
 
         with self.graph.as_default():
@@ -51,7 +89,7 @@ class ModelBuilder:
             lstm_in = tf.transpose(self.inputs_, [1, 0, 2])  # reshape into (seq_len, N, channels)
             lstm_in = tf.reshape(lstm_in, [-1, self.conf.n_channels])  # Now (seq_len*N, n_channels)
 
-            lstm_in = tf.layers.dense(lstm_in, self.conf.lstm_size, activation=None)
+            # lstm_in = tf.layers.dense(lstm_in, self.conf.lstm_size, activation=None)
             lstm_in = tf.split(lstm_in, self.conf.n_steps, 0)
 
             cell = tf.contrib.rnn.MultiRNNCell(
@@ -78,8 +116,8 @@ class ModelBuilder:
 
         self.run(Xtrain, Ytrain, Xvalid, Yvalid, cell, "lstm", figplot)
 
-    def train_cnn(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
 
+    def train_cnn(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
         with self.graph.as_default():
             # (batch, 128, 9) --> (batch, 64, 18)
             conv1 = tf.layers.conv1d(inputs = self.inputs_, filters = 2 * self.conf.n_channels, kernel_size = 2, strides = 1,
@@ -101,7 +139,6 @@ class ModelBuilder:
                                      padding='same', activation=tf.nn.relu)
             max_pool_4 = tf.layers.max_pooling1d(inputs=conv4, pool_size=2, strides=2, padding='same')
 
-
         with self.graph.as_default():
 
             flat = tf.reshape(max_pool_4, ( -1, self.conf.n_steps * self.conf.n_channels ))
@@ -117,10 +154,52 @@ class ModelBuilder:
         self.run(Xtrain, Ytrain, Xvalid, Yvalid, None, "cnn", figplot)
 
     def train_cnn_rnn(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
-        pass
+        with self.graph.as_default():
+            # (batch, 128, 9) --> (batch, 64, 18)
+            conv1 = tf.layers.conv1d(inputs = self.inputs_, filters = 2 * self.conf.n_channels, kernel_size = 2, strides = 1,
+                                     padding = 'same', activation = tf.nn.relu)
+            max_pool_1 = tf.layers.max_pooling1d(inputs = conv1, pool_size = 2, strides = 2, padding = 'same')
 
-    def train_bilstm(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
-        pass
+            # (batch, 64, 18) --> (batch, 32, 36)
+            conv2 = tf.layers.conv1d(inputs = max_pool_1, filters = 4 * self.conf.n_channels, kernel_size = 2, strides = 1,
+                                     padding = 'same', activation = tf.nn.relu)
+            max_pool_2 = tf.layers.max_pooling1d(inputs = conv2, pool_size = 2, strides = 2, padding = 'same')
+
+            n_ch = 4 * self.conf.n_channels
+            n_step = self.conf.n_steps / 4
+
+        with self.graph.as_default():
+
+            lstm_in = tf.transpose(max_pool_2, [1, 0, 2])
+            lstm_in = tf.reshape(lstm_in, [-1, n_ch])
+
+            # lstm_in = tf.layers.dense(lstm_in, self.conf.lstm_size, activation=None)
+            lstm_in = tf.split(lstm_in, n_step, 0)
+
+            cell = tf.contrib.rnn.MultiRNNCell(
+                [tf.contrib.rnn.DropoutWrapper(tf.contrib.rnn.BasicLSTMCell(self.conf.lstm_size),
+                                               output_keep_prob=self.keep_prob_) for _ in range(self.conf.lstm_layer)], state_is_tuple=True)
+            self.initial_state = cell.zero_state(self.conf.batch_size, tf.float32)
+
+        with self.graph.as_default():
+            outputs, self.final_state = tf.contrib.rnn.static_rnn(cell, lstm_in, dtype=tf.float32,
+                                                                  initial_state=self.initial_state)
+
+            logits = tf.layers.dense(outputs[-1], self.conf.n_class, name='logits')
+            self.logits = logits
+            self.softmax = tf.nn.softmax(self.logits)
+            self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=self.labels_))
+            train_op = tf.train.AdamOptimizer(self.learning_rate_)
+
+            gradients = train_op.compute_gradients(self.cost)
+            capped_gradients = [(tf.clip_by_value(grad, -1., 1.), var) for grad, var in gradients]
+            self.optimizer = train_op.apply_gradients(capped_gradients)
+
+            correct_pred = tf.equal(tf.argmax(logits, 1), tf.argmax(self.labels_, 1))
+            self.accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32), name='accuracy')
+
+        self.run(Xtrain, Ytrain, Xvalid, Yvalid, cell, "cnnlstm", figplot)
+
 
     def run(self, Xtrain, Ytrain, Xvalid, Yvalid, cell, type, figplot = False):
 
@@ -141,7 +220,7 @@ class ModelBuilder:
 
             for e in range(1, self.conf.epochs + 1):
 
-                if type == "lstm":
+                if type == "lstm" or 'cnnlstm':
                     state = sess.run(self.initial_state)
                 RanSelf = np.random.permutation(Xtrain.shape[0])
                 X_ran = Xtrain[RanSelf]
@@ -149,14 +228,14 @@ class ModelBuilder:
 
                 for x, y in self.get_batches(X_ran, Y_ran):
 
-                    if type == "lstm":
+                    if type == "lstm" or 'cnnlstm':
 
                         feed = {self.inputs_: x, self.labels_: y, self.keep_prob_: 0.5,
                                 self.initial_state: state, self.learning_rate_: self.conf.learning_rate}
 
                         loss, _, state, acc = sess.run([self.cost, self.optimizer, self.final_state, self.accuracy],
                                                        feed_dict = feed)
-                    elif type == "cnn":
+                    elif type == "cnn" or 'bilstm':
 
                         feed = {self.inputs_: x, self.labels_: y, self.keep_prob_: 0.5,
                                 self.learning_rate_: self.conf.learning_rate}
@@ -173,23 +252,24 @@ class ModelBuilder:
 
                     if (iteration % 10 == 0):
 
-                        if type == "lstm":
+                        if type == "lstm" or 'cnnlstm':
                             val_state = sess.run(cell.zero_state(self.conf.batch_size, tf.float32))
 
                         val_acc_ = []
                         val_loss_ = []
                         for x_v, y_v in self.get_batches(Xvalid, Yvalid):
 
-                            if type == "lstm":
+                            if type == "lstm" or 'cnnlstm':
 
                                 feed = {self.inputs_: x_v, self.labels_: y_v, self.keep_prob_: 1.0, self.initial_state: val_state}
+                                # feed = {self.inputs_: x_v, self.labels_: y_v, self.keep_prob_: 1.0}
 
-                                loss_v, state_v, acc_v = sess.run([self.cost, self.final_state, self.accuracy], feed_dict=feed)
+                                loss_v, state_v, acc_v = sess.run([self.cost, self.final_state, self.accuracy], feed_dict = feed)
 
-                            elif type == "cnn":
+                            elif type == "cnn" or 'bilstm':
 
                                 feed = {self.inputs_: x_v, self.labels_: y_v, self.keep_prob_: 1.0}
-                                loss_v, acc_v = sess.run([self.cost, self.accuracy], feed_dict=feed)
+                                loss_v, acc_v = sess.run([self.cost, self.accuracy], feed_dict = feed)
 
                             val_acc_.append(acc_v)
                             val_loss_.append(loss_v)
