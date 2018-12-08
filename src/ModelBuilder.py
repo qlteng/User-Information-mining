@@ -3,7 +3,9 @@
 
 import tensorflow as tf
 import datetime
+import os
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score, roc_curve, auc
 import logging
@@ -13,10 +15,11 @@ logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
 
 class ModelBuilder:
 
-    def __init__(self, modelconf, modelname):
+    def __init__(self, modelconf, modelname, target):
 
         self.conf = modelconf
         self.types = modelconf.types
+        self.target = target
         self.saver = None
         self.modelname = modelname
         self.modelpath = "../model/%s/%s" % (self.types, modelname)
@@ -45,10 +48,11 @@ class ModelBuilder:
             self.softmax = None
 
     def train_bilstm(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
-
+        logging.info("Model type is bilstm")
         with self.graph.as_default():
             lstm_in = tf.transpose(self.inputs_, [1, 0, 2])  # reshape into (seq_len, N, channels)
             lstm_in = tf.reshape(lstm_in, [-1, self.conf.n_channels])  # Now (seq_len*N, n_channels)
+            lstm_in = tf.layers.dense(lstm_in, self.conf.lstm_size, activation=None)
             lstm_in = tf.split(lstm_in, self.conf.n_steps, 0)
             lstm_fw = tf.contrib.rnn.BasicLSTMCell(self.conf.n_steps)
             lstm_bw = tf.contrib.rnn.BasicLSTMCell(self.conf.n_steps)
@@ -65,7 +69,10 @@ class ModelBuilder:
                                                            initial_state_bw = initial_state_bw, dtype = tf.float32)
             # outputs = tf.layers.dense(outputs[-1], self.conf.n_class, activation = None)
 
-            logits = tf.layers.dense(outputs[-1], self.conf.n_class, name = 'logits')
+            # logits = tf.layers.dense(outputs[-1], self.conf.n_class, name = 'logits')
+            lstm_in = tf.layers.dense(outputs[-1], 32)
+            logits = tf.layers.dense(lstm_in, self.conf.n_class, name='logits')
+
             self.logits = logits
             self.softmax = tf.nn.softmax(self.logits)
             self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=self.labels_))
@@ -83,13 +90,13 @@ class ModelBuilder:
 
 
     def train_lstm(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
-
+        logging.info("Model type is lstm")
         with self.graph.as_default():
 
             lstm_in = tf.transpose(self.inputs_, [1, 0, 2])  # reshape into (seq_len, N, channels)
             lstm_in = tf.reshape(lstm_in, [-1, self.conf.n_channels])  # Now (seq_len*N, n_channels)
-
-            # lstm_in = tf.layers.dense(lstm_in, self.conf.lstm_size, activation=None)
+            lstm_in = tf.layers.dense(lstm_in, 32)
+            lstm_in = tf.layers.dense(lstm_in, self.conf.lstm_size, activation=None)
             lstm_in = tf.split(lstm_in, self.conf.n_steps, 0)
 
             cell = tf.contrib.rnn.MultiRNNCell(
@@ -118,31 +125,33 @@ class ModelBuilder:
 
 
     def train_cnn(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
+        logging.info("Model type is cnn")
         with self.graph.as_default():
             # (batch, 128, 9) --> (batch, 64, 18)
-            conv1 = tf.layers.conv1d(inputs = self.inputs_, filters = 2 * self.conf.n_channels, kernel_size = 2, strides = 1,
+            conv1 = tf.layers.conv1d(inputs = self.inputs_, filters = 2 * self.conf.n_channels, kernel_size = 5, strides = 1,
                                      padding = 'same', activation = tf.nn.relu)
             max_pool_1 = tf.layers.max_pooling1d(inputs = conv1, pool_size = 2, strides = 2, padding = 'same')
 
             # (batch, 64, 18) --> (batch, 32, 36)
-            conv2 = tf.layers.conv1d(inputs = max_pool_1, filters = 4 * self.conf.n_channels, kernel_size = 2, strides = 1,
+            conv2 = tf.layers.conv1d(inputs = max_pool_1, filters = 4 * self.conf.n_channels, kernel_size = 5, strides = 1,
                                      padding = 'same', activation = tf.nn.relu)
             max_pool_2 = tf.layers.max_pooling1d(inputs = conv2, pool_size = 2, strides = 2, padding = 'same')
 
             # (batch, 32, 36) --> (batch, 16, 72)
-            conv3 = tf.layers.conv1d(inputs = max_pool_2, filters = 8 * self.conf.n_channels, kernel_size = 2, strides = 1,
-                                     padding = 'same', activation = tf.nn.relu)
-            max_pool_3 = tf.layers.max_pooling1d(inputs = conv3, pool_size = 2, strides = 2, padding = 'same')
-
-            # (batch, 16, 72) --> (batch, 8, 144)
-            conv4 = tf.layers.conv1d(inputs=max_pool_3, filters=16 * self.conf.n_channels, kernel_size=2, strides=1,
-                                     padding='same', activation=tf.nn.relu)
-            max_pool_4 = tf.layers.max_pooling1d(inputs=conv4, pool_size=2, strides=2, padding='same')
+            # conv3 = tf.layers.conv1d(inputs = max_pool_2, filters = 8 * self.conf.n_channels, kernel_size = 5, strides = 1,
+            #                          padding = 'same', activation = tf.nn.relu)
+            # max_pool_3 = tf.layers.max_pooling1d(inputs = conv3, pool_size = 2, strides = 2, padding = 'same')
+            #
+            # # (batch, 16, 72) --> (batch, 8, 144)
+            # conv4 = tf.layers.conv1d(inputs=max_pool_3, filters=16 * self.conf.n_channels, kernel_size=5, strides=1,
+            #                          padding='same', activation=tf.nn.relu)
+            # max_pool_4 = tf.layers.max_pooling1d(inputs=conv4, pool_size=2, strides=2, padding='same')
 
         with self.graph.as_default():
 
-            flat = tf.reshape(max_pool_4, ( -1, self.conf.n_steps * self.conf.n_channels ))
+            flat = tf.reshape(max_pool_2, ( -1, self.conf.n_steps * self.conf.n_channels ))
             flat = tf.nn.dropout(flat, keep_prob = self.keep_prob_)
+            flat = tf.layers.dense(flat, 128)
             self.logits = tf.layers.dense(flat, self.conf.n_class)
             self.softmax = tf.nn.softmax(self.logits)
 
@@ -153,24 +162,69 @@ class ModelBuilder:
 
         self.run(Xtrain, Ytrain, Xvalid, Yvalid, None, "cnn", figplot)
 
-    def train_cnn_rnn(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
+    def train_vgg(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
+        logging.info("Model type is vgg")
         with self.graph.as_default():
             # (batch, 128, 9) --> (batch, 64, 18)
-            conv1 = tf.layers.conv1d(inputs = self.inputs_, filters = 2 * self.conf.n_channels, kernel_size = 2, strides = 1,
-                                     padding = 'same', activation = tf.nn.relu)
-            max_pool_1 = tf.layers.max_pooling1d(inputs = conv1, pool_size = 2, strides = 2, padding = 'same')
+            conv1 = tf.layers.conv1d(inputs=self.inputs_, filters=2 * self.conf.n_channels, kernel_size=5, strides=1,
+                                     padding='same', activation=tf.nn.relu)
+            conv2 = tf.layers.conv1d(inputs=conv1, filters=2 * self.conf.n_channels, kernel_size=5, strides=1,
+                                     padding='same', activation=tf.nn.relu)
+            max_pool_1 = tf.layers.max_pooling1d(inputs=conv2, pool_size=2, strides=2, padding='same')
 
             # (batch, 64, 18) --> (batch, 32, 36)
-            conv2 = tf.layers.conv1d(inputs = max_pool_1, filters = 4 * self.conf.n_channels, kernel_size = 2, strides = 1,
-                                     padding = 'same', activation = tf.nn.relu)
-            max_pool_2 = tf.layers.max_pooling1d(inputs = conv2, pool_size = 2, strides = 2, padding = 'same')
+            conv3 = tf.layers.conv1d(inputs=max_pool_1, filters=4 * self.conf.n_channels, kernel_size=5, strides=1,
+                                     padding='same', activation=tf.nn.relu)
+            conv4 = tf.layers.conv1d(inputs=conv3, filters=4 * self.conf.n_channels, kernel_size=5, strides=1,
+                                     padding='same', activation=tf.nn.relu)
+            max_pool_2 = tf.layers.max_pooling1d(inputs=conv4, pool_size=2, strides=2, padding='same')
 
-            n_ch = 4 * self.conf.n_channels
-            n_step = self.conf.n_steps / 4
+            conv5 = tf.layers.conv1d(inputs=max_pool_2, filters=8 * self.conf.n_channels, kernel_size=5, strides=1,
+                                     padding='same', activation=tf.nn.relu)
+            max_pool_3 = tf.layers.max_pooling1d(inputs=conv5, pool_size=2, strides=2, padding='same')
 
         with self.graph.as_default():
 
-            lstm_in = tf.transpose(max_pool_2, [1, 0, 2])
+            flat = tf.reshape(max_pool_3, ( -1, self.conf.n_steps * self.conf.n_channels ))
+            flat = tf.nn.dropout(flat, keep_prob = self.keep_prob_)
+            flat = tf.layers.dense(flat, 128)
+            self.logits = tf.layers.dense(flat, self.conf.n_class)
+            self.softmax = tf.nn.softmax(self.logits)
+
+            self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=self.logits, labels=self.labels_))
+            self.optimizer = tf.train.AdamOptimizer(self.learning_rate_).minimize(self.cost)
+            correct_pred = tf.equal(tf.argmax(self.logits, 1), tf.argmax(self.labels_, 1))
+            self.accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32), name='accuracy')
+
+        self.run(Xtrain, Ytrain, Xvalid, Yvalid, None, "vgg", figplot)
+
+    def train_vgg_lstm(self, Xtrain, Ytrain, Xvalid, Yvalid, figplot = False):
+        logging.info("Model type is vgglstm")
+        with self.graph.as_default():
+            # (batch, 128, 9) --> (batch, 64, 18)
+            conv1 = tf.layers.conv1d(inputs = self.inputs_, filters = 2 * self.conf.n_channels, kernel_size = 5, strides = 1,
+                                     padding = 'same', activation = tf.nn.relu)
+            conv2 = tf.layers.conv1d(inputs=conv1, filters=2 * self.conf.n_channels, kernel_size=5, strides=1,
+                                     padding='same', activation=tf.nn.relu)
+            max_pool_1 = tf.layers.max_pooling1d(inputs = conv2, pool_size = 2, strides = 2, padding = 'same')
+
+            # (batch, 64, 18) --> (batch, 32, 36)
+            conv3 = tf.layers.conv1d(inputs = max_pool_1, filters = 4 * self.conf.n_channels, kernel_size = 5, strides = 1,
+                                     padding = 'same', activation = tf.nn.relu)
+            conv4 = tf.layers.conv1d(inputs=conv3, filters=4 * self.conf.n_channels, kernel_size=5, strides=1,
+                                     padding='same', activation=tf.nn.relu)
+            max_pool_2 = tf.layers.max_pooling1d(inputs = conv4, pool_size = 2, strides = 2, padding = 'same')
+
+            conv5 = tf.layers.conv1d(inputs=max_pool_2, filters=8 * self.conf.n_channels, kernel_size=5, strides=1,
+                                     padding='same', activation=tf.nn.relu)
+            max_pool_3 = tf.layers.max_pooling1d(inputs=conv5, pool_size=2, strides=2, padding='same')
+
+            n_ch = 8 * self.conf.n_channels
+            n_step = self.conf.n_steps / 8
+
+        with self.graph.as_default():
+
+            lstm_in = tf.transpose(max_pool_3, [1, 0, 2])
             lstm_in = tf.reshape(lstm_in, [-1, n_ch])
 
             # lstm_in = tf.layers.dense(lstm_in, self.conf.lstm_size, activation=None)
@@ -184,8 +238,8 @@ class ModelBuilder:
         with self.graph.as_default():
             outputs, self.final_state = tf.contrib.rnn.static_rnn(cell, lstm_in, dtype=tf.float32,
                                                                   initial_state=self.initial_state)
-
-            logits = tf.layers.dense(outputs[-1], self.conf.n_class, name='logits')
+            logits = tf.layers.dense(outputs[-1], 64)
+            logits = tf.layers.dense(logits, self.conf.n_class, name='logits')
             self.logits = logits
             self.softmax = tf.nn.softmax(self.logits)
             self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits, labels=self.labels_))
@@ -198,7 +252,7 @@ class ModelBuilder:
             correct_pred = tf.equal(tf.argmax(logits, 1), tf.argmax(self.labels_, 1))
             self.accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32), name='accuracy')
 
-        self.run(Xtrain, Ytrain, Xvalid, Yvalid, cell, "cnnlstm", figplot)
+        self.run(Xtrain, Ytrain, Xvalid, Yvalid, cell, "vgglstm", figplot)
 
 
     def run(self, Xtrain, Ytrain, Xvalid, Yvalid, cell, type, figplot = False):
@@ -220,7 +274,7 @@ class ModelBuilder:
 
             for e in range(1, self.conf.epochs + 1):
 
-                if type == "lstm" or 'cnnlstm':
+                if type in ["lstm",'vgglstm']:
                     state = sess.run(self.initial_state)
                 RanSelf = np.random.permutation(Xtrain.shape[0])
                 X_ran = Xtrain[RanSelf]
@@ -228,14 +282,14 @@ class ModelBuilder:
 
                 for x, y in self.get_batches(X_ran, Y_ran):
 
-                    if type == "lstm" or 'cnnlstm':
+                    if type in ["lstm",'vgglstm']:
 
                         feed = {self.inputs_: x, self.labels_: y, self.keep_prob_: 0.5,
                                 self.initial_state: state, self.learning_rate_: self.conf.learning_rate}
 
                         loss, _, state, acc = sess.run([self.cost, self.optimizer, self.final_state, self.accuracy],
                                                        feed_dict = feed)
-                    elif type == "cnn" or 'bilstm':
+                    elif type in ["cnn",'bilstm','vgg']:
 
                         feed = {self.inputs_: x, self.labels_: y, self.keep_prob_: 0.5,
                                 self.learning_rate_: self.conf.learning_rate}
@@ -244,7 +298,7 @@ class ModelBuilder:
                     train_acc.append(acc)
                     train_loss.append(loss)
 
-                    if (iteration % 5 == 0):
+                    if (iteration % 100 == 0):
                         print("Epoch: {}/{}".format(e, self.conf.epochs),
                               "Iteration: {:d}".format(iteration),
                               "Train loss: {:6f}".format(loss),
@@ -252,32 +306,32 @@ class ModelBuilder:
 
                     if (iteration % 10 == 0):
 
-                        if type == "lstm" or 'cnnlstm':
+                        if type in ["lstm",'vgglstm']:
                             val_state = sess.run(cell.zero_state(self.conf.batch_size, tf.float32))
 
                         val_acc_ = []
                         val_loss_ = []
                         for x_v, y_v in self.get_batches(Xvalid, Yvalid):
 
-                            if type == "lstm" or 'cnnlstm':
+                            if type in ["lstm",'vgglstm']:
 
                                 feed = {self.inputs_: x_v, self.labels_: y_v, self.keep_prob_: 1.0, self.initial_state: val_state}
                                 # feed = {self.inputs_: x_v, self.labels_: y_v, self.keep_prob_: 1.0}
 
                                 loss_v, state_v, acc_v = sess.run([self.cost, self.final_state, self.accuracy], feed_dict = feed)
 
-                            elif type == "cnn" or 'bilstm':
+                            elif type in ["cnn",'bilstm','vgg']:
 
                                 feed = {self.inputs_: x_v, self.labels_: y_v, self.keep_prob_: 1.0}
                                 loss_v, acc_v = sess.run([self.cost, self.accuracy], feed_dict = feed)
 
                             val_acc_.append(acc_v)
                             val_loss_.append(loss_v)
-
-                        print("Epoch: {}/{}".format(e, self.conf.epochs),
-                              "Iteration: {:d}".format(iteration),
-                              "Validation loss: {:6f}".format(np.mean(val_loss_)),
-                              "Validation acc: {:.6f}".format(np.mean(val_acc_)))
+                        if (iteration % 100 == 0):
+                            print("Epoch: {}/{}".format(e, self.conf.epochs),
+                                  "Iteration: {:d}".format(iteration),
+                                  "Validation loss: {:6f}".format(np.mean(val_loss_)),
+                                  "Validation acc: {:.6f}".format(np.mean(val_acc_)))
 
                         maxvalideacc = 0
                         validation_acc.append(np.mean(val_acc_))
@@ -296,6 +350,9 @@ class ModelBuilder:
 
     def plot(self, iter, train_loss, train_acc, valid_loss, valid_acc):
 
+        path_prefix = "../output/%s/%s/%s" %(self.types, self.target, self.modelname)
+        if not os.path.exists(path_prefix):
+            os.makedirs(path_prefix)
         t = np.arange(iter - 1)
 
         plt.figure(figsize = (6,6))
@@ -303,14 +360,14 @@ class ModelBuilder:
         plt.xlabel("iteration")
         plt.ylabel("Loss")
         plt.legend(['train', 'validation'], loc='upper right')
-        plt.show()
+        plt.savefig("%s/loss.jpg" %path_prefix)
 
         plt.figure(figsize = (6,6))
         plt.plot(t, np.array(train_acc), 'r-', t[t % 10 == 0], np.array(valid_acc), 'b*')
         plt.xlabel("iteration")
         plt.ylabel("Accuray")
         plt.legend(['train', 'validation'], loc='upper right')
-        plt.show()
+        plt.savefig("%s/acc.jpg" % path_prefix)
 
     def get_batches(self, X, Y):
 
@@ -331,8 +388,11 @@ class ModelBuilder:
         start_time = datetime.datetime.now()
 
         with tf.Session(graph = self.graph) as sess:
-
-            self.saver.restore(sess, tf.train.latest_checkpoint(self.modelpath))
+            # self.saver = tf.train.import_meta_graph("%s/model.ckpt.meta" % self.modelpath)
+            ckpt = tf.train.get_checkpoint_state(self.modelpath)
+            if ckpt and ckpt.model_checkpoint_path:
+                self.saver.restore(sess, ckpt.model_checkpoint_path)
+            # self.saver.restore(sess, tf.train.latest_checkpoint(self.modelpath))
             for x_t, y_t in self.get_batches(X_test, y_test):
 
                 feed = { self.inputs_: x_t, self.labels_: y_t, self.keep_prob_: 1 }
@@ -358,7 +418,21 @@ class ModelBuilder:
             print "f1_score", f1_score(y_truelist, y_plist, average='weighted')
             print "confusion_matrix"
             cf_matrix = confusion_matrix(y_truelist, y_plist)
-            print cf_matrix
+
+            cf_matrix_path = "../output/%s/%s/%s/cf.txt"%(self.types,self.target,self.modelname)
+            cf_matrix = np.array(cf_matrix)
+            np.savetxt(cf_matrix_path, cf_matrix, fmt = "%d")
+
+            res = [self.modelname, self.train_time, self.test_time, self.train_size, self.test_size, np.mean(test_acc), \
+                   precision_score(y_truelist, y_plist, average='weighted'),recall_score(y_truelist, y_plist, average='weighted'), \
+                   f1_score(y_truelist, y_plist, average='weighted')]
+            header = ["modelname","train time","test time","train size","test size","Test accuracy","Precision","Recall","f1_score"]
+            res_csv = "../output/%s/%s/res.csv" % (self.types, self.target)
+            res = pd.DataFrame([res])
+            if not os.path.exists(res_csv):
+                res.to_csv(res_csv, header = header, index = False, mode = "a+")
+            else:
+                res.to_csv(res_csv, header = False, index = False, mode = "a+")
 
             if ROC == True:
 

@@ -44,8 +44,12 @@ class DataPreprocess:
             pass
 
         elif self.df.datasource == 'hasc':
+            raw_data_path = ""
+            if self.df.types == 'recog':
+                raw_data_path = "../data/hasc/sport_simple_data"
+            elif self.df.types == 'authen':
+                raw_data_path = "../data/hasc/human_walk_data"
 
-            raw_data_path = "../data/hasc/raw_data"
             if not os.path.exists(raw_data_path):
                 logging.warning("Raw data path %s doesn't exist" % raw_data_path)
                 logging.info("Begin to dump data from mysql")
@@ -55,7 +59,7 @@ class DataPreprocess:
             else:
                 logging.info("Load raw data from %s" % raw_data_path)
 
-            condition_path = "%s/condition_data/T_%s_P_%s_A_%s"%(self.df.path, self.phonetype, self.phoneposition, self.activity)
+            condition_path = "%s/condition_data/%s#T_%s_P_%s_A_%s"%(self.df.path, self.target, self.phonetype, self.phoneposition, self.activity)
 
             if not os.path.exists(condition_path):
                 logging.warning("Condition data path %s doesn't exist" % condition_path)
@@ -68,7 +72,7 @@ class DataPreprocess:
                 logging.warning("Split data path %s doesn't exist" % segment_data_path)
                 logging.info("Begin to window data with the same size")
                 os.mkdir(segment_data_path)
-                self.para_cut(raw_data_path, segment_data_path, self.df.n_steps, self.df.overlap, self.df.n_class,
+                self.para_cut(raw_data_path, segment_data_path, self.df.n_steps, self.df.overlap, self.target,
                               self.df.n_channels, self.phonetype, self.phoneposition, self.activity)
                 logging.info("Cut and save split_data at %s!" % segment_data_path)
 
@@ -97,7 +101,7 @@ class DataPreprocess:
 
         for i in range(len(label)):
 
-            Person, Gender, Height, Weight, Position, Type, Mount, Activity = label[i].split('#')
+            Person, Gender, Generation, Height, Weight, Position, Type, Mount, Activity = label[i].split('#')
 
             if types == 'recog':
                 if target == 'activity':
@@ -106,13 +110,32 @@ class DataPreprocess:
                     label[i] = Person
                 elif target == 'gender':
                     label[i] = Gender
+                elif target == 'height':
+                    if float(Height) <=160:
+                        label[i] = 0
+                    elif float(Height) <=170:
+                        label[i] = 1
+                    elif float(Height) <=180:
+                        label[i] = 2
+                    elif float(Height) >181:
+                        label[i] = 3
+
+                elif target == 'weight':
+                    if float(Height) <=160:
+                        label[i] = 0
+                    elif float(Height) <=170:
+                        label[i] = 1
+                    elif float(Height) <=180:
+                        label[i] = 2
+                    elif float(Height) >181:
+                        label[i] = 3
 
             elif types == 'authen':
                 pass
 
         return label
 
-    def segment(self, index, raw_data_path, segment_data_path, n_steps, overlap, n_class, n_channels, phonetype, phoneposition, activity):
+    def segment(self, index, raw_data_path, segment_data_path, n_steps, overlap, target, n_channels, phonetype, phoneposition, activity):
 
         datafile = "%s/dump_data%d.json" % (raw_data_path, index)
         labelfile = "%s/dump_label%d.json" % (raw_data_path, index)
@@ -127,13 +150,62 @@ class DataPreprocess:
 
         for x in raw_data:
             label[x] = label[x].decode().encode()
-            # filter condition
-            if phonetype != '' and phonetype not in label[x]:
+            # filter condition 1
+            keys = ['person', 'gender', 'generation', 'height', 'weight', 'position', 'type', 'mount', 'activity']
+            values = label[x].split('#')
+            tempdict = dict(zip(keys,values))
+
+            if tempdict[target] == None:
                 continue
-            if phoneposition != '' and phoneposition not in label[x]:
+
+            if target == 'weight':
+                if tempdict['weight'] in [0, '0']:
+                    continue
+
+            if target == 'generation':
+                if tempdict['generation'] not in ['20;early','20;late','30;early','30;late','40;early','40;late',\
+                                                  '50;early','50;late','60;early','60;late']:
+                    continue
+
+
+            if tempdict['activity'] not in ['jog','skip','stay','stDown','stUp','walk']:
                 continue
-            if activity != '' and activity not in label[x]:
+
+            if tempdict['type'] in ['Samsung;NexusS;AndroidOS 4.1;','Samsung;Nexus S;Android OS 4.1.2']:
+                tempdict['type'] = 'NexusS'
+            elif tempdict['type'] in ['Samsung;Galaxy Nexus;AndroidOS 4.1;','Samsung;Galaxy Nexus;Android OS 4.1.2',\
+                                      'SAMSUNG; Galaxy Nexus; Android 4.1.2']:
+                tempdict['type'] = 'Nexus'
+            if phonetype != '' and phonetype != tempdict['type']:
                 continue
+
+            if tempdict['position'] in ['arm;hand','arm;left;hand','arm;right;hand','arm;left;wrist','arm;right;wrist']:
+                tempdict['position'] = 'arm'
+
+            elif tempdict['position'] in ['bag','bag;position(fixed);backpack','bag;position(fixed);handback',\
+                                          'bag;position(fixed);messengerbag','bag;position(fixed);shoulderbag']:
+                tempdict['position'] = 'bag'
+
+            elif tempdict['position'] in ['strap;waist;rear','waist','waist;left;pocket','wear;outer;waist;front', \
+                                          'wear;pants;waist;fit;right-back','wear;pants;front','wear;pants;waist;fit;left-front',\
+                                          'wear;pants;waist;fit;right-front','wear;pants;waist;fit;rigtht-front',\
+                                          'wear;pants;waist;ruse;right-front']:
+                tempdict['position'] = 'waist'
+
+            elif tempdict['position'] in ['wear;outer;chest','wear;outer;chest;left']:
+                tempdict['position'] = 'chest'
+            if phoneposition != '' and phoneposition != tempdict['position']:
+                continue
+
+            # filter condition 2
+            # if phonetype != '' and phonetype not in label[x]:
+            #     continue
+            # if phoneposition != '' and phoneposition not in label[x]:
+            #     continue
+            # if activity != '' and activity not in label[x]:
+            #     continue
+            label[x] = '#'.join([tempdict['person'], tempdict['gender'], tempdict['generation'], tempdict['height'], \
+                                 tempdict['weight'], tempdict['position'], tempdict['type'], tempdict['mount'], tempdict['activity']])
 
             format_data = pd.DataFrame(list(raw_data[x]), columns=['AX', 'AY', 'AZ', 'GX', 'GY', 'GZ'])
             temp_data = np.empty((0, n_steps, n_channels))
@@ -169,13 +241,13 @@ class DataPreprocess:
             yield start, start + n_steps
             start += int(n_steps * overlap)
 
-    def para_cut(self, raw_data_path, segment_data_path, n_steps, overlap, n_class, n_channels, phonetype, phoneposition, activity):
+    def para_cut(self, raw_data_path, segment_data_path, n_steps, overlap, target, n_channels, phonetype, phoneposition, activity):
 
         process_num = self.process_num
         record = []
         for index in xrange(0, process_num):
 
-            p = multiprocessing.Process(target = self.segment, args=(index, raw_data_path, segment_data_path, n_steps, overlap, n_class, n_channels, phonetype, phoneposition, activity))
+            p = multiprocessing.Process(target = self.segment, args=(index, raw_data_path, segment_data_path, n_steps, overlap, target, n_channels, phonetype, phoneposition, activity))
             p.start()
             record.append(p)
 
@@ -199,7 +271,6 @@ class DataPreprocess:
 
         Y = np.array(Y)
         Y = np.asarray(pd.get_dummies(np.array(Y)), dtype=np.int8)
-        print Y.shape
 
         return X, Y
 
