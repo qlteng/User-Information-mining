@@ -16,7 +16,7 @@ logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
 #               "person06020","person06021","person06022","person06023"]
 
 TerminalType = ["Logger+Wifi for Android;1.0", "NexusS", "Nexus"]
-TerminalPosition = ['arm','bag','waist','chest']
+TerminalPosition = ['arm','bag','waist','chest','']
 
 # TerminalPosition = ["wear;outer;chest;left","arm;right;hand","wear;pants;waist;fit;right-front",
 #                     "wear;pants;waist;fit;right-back","bag;position(fixed);shoulderbag","bag;position(fixed);handback"
@@ -50,16 +50,15 @@ def run(allconfig):
 
     # for model in ['cnn', 'vgglstm', 'lstm', 'bilstm','vgg']:
     # for model in ['cnn', 'vgglstm', 'vgg']:
-    model = 'bilstm'
+    model = 'lstm'
     modelname = "%s#%s" % (model, modelname_prefix)
-    # modelname = "cnn#%s" % (modelname_prefix)
     modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=400, learning_rate=0.0001, epochs=50)
     modelbuild = ModelBuilder.ModelBuilder(modelconf, modelname, allconfig['target'])
-    modelbuild.train_bilstm(x_train, y_train, x_valid, y_valid, figplot=True)
+    modelbuild.train_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
     modelbuild.test(x_test, y_test, ROC=False)
 
 #     record = []
-#     for model in ['cnn','cnn-rnn','lstm','bilstm']:
+#     for model in ['cnn','vgglstm','vgg']:
 #         p = multiprocessing.Process(target=para_train, args=(model, modelname_prefix, dataconf, x_train, y_train, x_valid, y_valid, x_test, y_test))
 #         p.start()
 #         record.append(p)
@@ -75,17 +74,13 @@ def run(allconfig):
 #
 #         modelbuild.train_cnn(x_train, y_train, x_valid, y_valid, figplot=True)
 #         modelbuild.test(x_test, y_test, ROC=False)
-#     elif model == 'cnn-rnn':
+#     elif model == 'vgglstm':
 #
-#         modelbuild.train_cnn_rnn(x_train, y_train, x_valid, y_valid, figplot=True)
+#         modelbuild.train_vgg_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
 #         modelbuild.test(x_test, y_test, ROC=False)
-#     elif model == 'lstm':
+#     elif model == 'vgg':
 #
-#         modelbuild.train_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
-#         modelbuild.test(x_test, y_test, ROC=False)
-#     elif model == 'bilstm':
-#
-#         modelbuild.train_bilstm(x_train, y_train, x_valid, y_valid, figplot=True)
+#         modelbuild.train_vgg(x_train, y_train, x_valid, y_valid, figplot=True)
 #         modelbuild.test(x_test, y_test, ROC=False)
 
 if __name__ == '__main__':
@@ -93,11 +88,10 @@ if __name__ == '__main__':
 
     allconfig = {'datasource': 'hasc', 'types': 'recog', 'n_steps': 256, 'n_channel':6, \
               'n_class': 6, 'overlap': 0.5, 'target': 'activity', 'process_num' : 40, \
-              'condition' : {'phonetype' : "", 'phoneposition' : 'waist', 'activity' : ''}}
-    run(allconfig)
-    # for position in TerminalPosition:
-    #     allconfig['condition']['phoneposition'] = position
-    #     run(allconfig)
+              'condition' : {'phonetype' : "", 'phoneposition' : '', 'activity' : ''}}
+    for position in TerminalPosition:
+        allconfig['condition']['phoneposition'] = position
+        run(allconfig)
 
 
 
