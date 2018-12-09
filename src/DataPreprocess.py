@@ -105,6 +105,7 @@ class DataPreprocess:
             Person, Gender, Generation, Height, Weight, Position, Type, Mount, Activity = label[i].split('#')
 
             if types == 'recog':
+
                 if target == 'activity':
                     label[i] = Activity
                 elif target == 'person':
@@ -120,18 +121,22 @@ class DataPreprocess:
                         label[i] = 1
                     elif float(Height) <=180:
                         label[i] = 2
-                    elif float(Height) >181:
+                    elif float(Height) >=181:
                         label[i] = 3
+                    if label[i] not in [0,1,2,3]:
+                        continue
 
                 elif target == 'weight':
-                    if float(Height) <=160:
+                    if float(Height) <=55:
                         label[i] = 0
-                    elif float(Height) <=170:
+                    elif float(Height) <=65:
                         label[i] = 1
-                    elif float(Height) <=180:
+                    elif float(Height) <=75:
                         label[i] = 2
-                    elif float(Height) >181:
+                    elif float(Height) >=76:
                         label[i] = 3
+                    if label[i] not in [0,1,2,3]:
+                        continue
 
             elif types == 'authen':
                 pass
@@ -280,7 +285,9 @@ class DataPreprocess:
             Y.extend(temp_label)
 
         Y = np.array(Y)
+        print np.unique(Y)
         Y = np.asarray(pd.get_dummies(np.array(Y)), dtype=np.int8)
+        logging.info("Label has %d class"%Y[0].shape[0])
         assert Y[0].shape[0] == n_class
 
         return X, Y
