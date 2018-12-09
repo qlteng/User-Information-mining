@@ -4,6 +4,7 @@ import os
 import json
 import multiprocessing
 import logging
+import random
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -168,6 +169,10 @@ class DataPreprocess:
                 if tempdict['generation'] not in ['20;early','20;late','30;early','30;late','40;early','40;late',\
                                                   '50;early','50;late','60;early','60;late']:
                     continue
+                if tempdict['generation'] == '20;early':
+                    if random.random() > 0.005:
+                        continue
+
 
 
             if tempdict['activity'] not in ['jog','skip','stay','stDown','stUp','walk']:
@@ -196,6 +201,9 @@ class DataPreprocess:
 
             elif tempdict['position'] in ['wear;outer;chest','wear;outer;chest;left']:
                 tempdict['position'] = 'chest'
+                
+            if tempdict['position'] not in ['arm','bag','waist','chest']:
+                continue
             if phoneposition != '' and phoneposition != tempdict['position']:
                 continue
 
