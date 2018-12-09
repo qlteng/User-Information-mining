@@ -11,9 +11,6 @@ import ModelBuilder
 LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
 logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
 
-# Person = ["person06010","person06011","person06012","person06013","person06014",
-#               "person06015","person06016","person06017","person06018","person06019",
-#               "person06020","person06021","person06022","person06023"]
 
 TerminalType = ["Logger+Wifi for Android;1.0", "NexusS", "Nexus"]
 TerminalPosition = ['arm','bag','waist','chest','']
