@@ -95,8 +95,8 @@ class ModelBuilder:
 
             lstm_in = tf.transpose(self.inputs_, [1, 0, 2])  # reshape into (seq_len, N, channels)
             lstm_in = tf.reshape(lstm_in, [-1, self.conf.n_channels])  # Now (seq_len*N, n_channels)
-            lstm_in = tf.layers.dense(lstm_in, 32)
-            lstm_in = tf.layers.dense(lstm_in, self.conf.lstm_size, activation=None)
+            lstm_in = tf.layers.dense(lstm_in, self.conf.lstm_size)
+            # lstm_in = tf.layers.dense(lstm_in, self.conf.n_class, activation=None)
             lstm_in = tf.split(lstm_in, self.conf.n_steps, 0)
 
             cell = tf.contrib.rnn.MultiRNNCell(
@@ -107,8 +107,10 @@ class ModelBuilder:
         with self.graph.as_default():
             outputs, self.final_state = tf.contrib.rnn.static_rnn(cell, lstm_in, dtype = tf.float32,
                                                              initial_state = self.initial_state)
+            lstm_in = tf.layers.dense(outputs[-1], 32)
 
-            logits = tf.layers.dense(outputs[-1], self.conf.n_class, name = 'logits')
+            logits = tf.layers.dense(lstm_in, self.conf.n_class, name='logits')
+            # logits = tf.layers.dense(outputs[-1], self.conf.n_class, name = 'logits')
             self.logits = logits
             self.softmax = tf.nn.softmax(self.logits)
             self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits = logits, labels = self.labels_))
@@ -217,7 +219,9 @@ class ModelBuilder:
 
             conv5 = tf.layers.conv1d(inputs=max_pool_2, filters=8 * self.conf.n_channels, kernel_size=5, strides=1,
                                      padding='same', activation=tf.nn.relu)
-            max_pool_3 = tf.layers.max_pooling1d(inputs=conv5, pool_size=2, strides=2, padding='same')
+            conv6 = tf.layers.conv1d(inputs=conv5, filters=8 * self.conf.n_channels, kernel_size=5, strides=1,
+                                     padding='same', activation=tf.nn.relu)
+            max_pool_3 = tf.layers.max_pooling1d(inputs=conv6, pool_size=2, strides=2, padding='same')
 
             n_ch = 8 * self.conf.n_channels
             n_step = self.conf.n_steps / 8
@@ -238,7 +242,7 @@ class ModelBuilder:
         with self.graph.as_default():
             outputs, self.final_state = tf.contrib.rnn.static_rnn(cell, lstm_in, dtype=tf.float32,
                                                                   initial_state=self.initial_state)
-            logits = tf.layers.dense(outputs[-1], 64)
+            logits = tf.layers.dense(outputs[-1], 128)
             logits = tf.layers.dense(logits, self.conf.n_class, name='logits')
             self.logits = logits
             self.softmax = tf.nn.softmax(self.logits)
