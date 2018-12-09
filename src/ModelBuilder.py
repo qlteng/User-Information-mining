@@ -22,7 +22,9 @@ class ModelBuilder:
         self.target = target
         self.saver = None
         self.modelname = modelname
-        self.modelpath = "../model/%s/%s" % (self.types, modelname)
+        self.modelpath = "../model/%s/%s/%s" % (self.types,target, modelname)
+        if not os.path.exists(self.modelpath):
+            os.makedirs(self.modelpath)
         self.output = "../output/%s" % modelname
 
         self.train_time = 0

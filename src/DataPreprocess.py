@@ -182,6 +182,8 @@ class DataPreprocess:
 
             if tempdict['activity'] not in ['jog','skip','stay','stDown','stUp','walk']:
                 continue
+            if activity != '' and activity != tempdict['activity']:
+                continue
 
             if tempdict['type'] in ['Samsung;NexusS;AndroidOS 4.1;','Samsung;Nexus S;Android OS 4.1.2']:
                 tempdict['type'] = 'NexusS'

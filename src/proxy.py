@@ -32,7 +32,8 @@ def run(allconfig):
     process = DataPreprocess.DataPreprocess(dataconf=dataconf, process_num=allconfig['process_num'],
                                             target=allconfig['target'], \
                                             phonetype=allconfig['condition']['phonetype'],
-                                            phoneposition=allconfig['condition']['phoneposition'])
+                                            phoneposition=allconfig['condition']['phoneposition'],
+                                            activity=allconfig['condition']['activity'])
 
     x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard=False)
     if len(x_train) == 0:
@@ -47,48 +48,49 @@ def run(allconfig):
 
     # for model in ['cnn', 'vgglstm', 'lstm', 'bilstm','vgg']:
     # for model in ['cnn', 'vgglstm', 'vgg']:
-    model = 'lstm'
-    modelname = "%s#%s" % (model, modelname_prefix)
-    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=400, learning_rate=0.0001, epochs=50)
-    modelbuild = ModelBuilder.ModelBuilder(modelconf, modelname, allconfig['target'])
-    modelbuild.train_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
-    modelbuild.test(x_test, y_test, ROC=False)
+    # model = 'lstm'
+    # modelname = "%s#%s" % (model, modelname_prefix)
+    # modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=400, learning_rate=0.0001, epochs=50)
+    # modelbuild = ModelBuilder.ModelBuilder(modelconf, modelname, allconfig['target'])
+    # modelbuild.train_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
+    # modelbuild.test(x_test, y_test, ROC=False)
 
-#     record = []
-#     for model in ['cnn','vgglstm','vgg']:
-#         p = multiprocessing.Process(target=para_train, args=(model, modelname_prefix, dataconf, x_train, y_train, x_valid, y_valid, x_test, y_test))
-#         p.start()
-#         record.append(p)
-#     for process in record:
-#         process.join()
-# #
-# def para_train(model, modelname_prefix, dataconf,x_train, y_train, x_valid, y_valid, x_test, y_test):
+    record = []
+    for model in ['cnn','vgglstm','vgg']:
+        p = multiprocessing.Process(target=para_train, args=(model, modelname_prefix, dataconf, x_train, y_train, x_valid, y_valid, x_test, y_test))
+        p.start()
+        record.append(p)
+    for process in record:
+        process.join()
 #
-#     modelname = "%s#%s"% (model,modelname_prefix)
-#     modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=600, learning_rate=0.0001, epochs=100)
-#     modelbuild = ModelBuilder.ModelBuilder(modelconf, modelname, allconfig['target'])
-#     if model == 'cnn':
-#
-#         modelbuild.train_cnn(x_train, y_train, x_valid, y_valid, figplot=True)
-#         modelbuild.test(x_test, y_test, ROC=False)
-#     elif model == 'vgglstm':
-#
-#         modelbuild.train_vgg_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
-#         modelbuild.test(x_test, y_test, ROC=False)
-#     elif model == 'vgg':
-#
-#         modelbuild.train_vgg(x_train, y_train, x_valid, y_valid, figplot=True)
-#         modelbuild.test(x_test, y_test, ROC=False)
+def para_train(model, modelname_prefix, dataconf,x_train, y_train, x_valid, y_valid, x_test, y_test):
+
+    modelname = "%s#%s"% (model,modelname_prefix)
+    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=600, learning_rate=0.0001, epochs=50)
+    modelbuild = ModelBuilder.ModelBuilder(modelconf, modelname, allconfig['target'])
+    if model == 'cnn':
+
+        modelbuild.train_cnn(x_train, y_train, x_valid, y_valid, figplot=True)
+        modelbuild.test(x_test, y_test, ROC=False)
+    elif model == 'vgglstm':
+
+        modelbuild.train_vgg_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
+        modelbuild.test(x_test, y_test, ROC=False)
+    elif model == 'vgg':
+
+        modelbuild.train_vgg(x_train, y_train, x_valid, y_valid, figplot=True)
+        modelbuild.test(x_test, y_test, ROC=False)
 
 if __name__ == '__main__':
 
 
     allconfig = {'datasource': 'hasc', 'types': 'recog', 'n_steps': 256, 'n_channel':6, \
-              'n_class': 6, 'overlap': 0.5, 'target': 'activity', 'process_num' : 40, \
-              'condition' : {'phonetype' : "", 'phoneposition' : '', 'activity' : ''}}
-    for position in TerminalPosition:
-        allconfig['condition']['phoneposition'] = position
-        run(allconfig)
+              'n_class': 10, 'overlap': 0.5, 'target': 'generation', 'process_num' : 40, \
+              'condition' : {'phonetype' : "", 'phoneposition' : '', 'activity' : 'walk'}}
+    run(allconfig)
+    # for position in TerminalPosition:
+    #     allconfig['condition']['phoneposition'] = position
+    #     run(allconfig)
 
 
 
