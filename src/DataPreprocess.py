@@ -110,6 +110,8 @@ class DataPreprocess:
                     label[i] = Person
                 elif target == 'gender':
                     label[i] = Gender
+                elif target == 'generation':
+                    label[i] = Generation
                 elif target == 'height':
                     if float(Height) <=160:
                         label[i] = 0
