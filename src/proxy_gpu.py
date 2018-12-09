@@ -38,7 +38,8 @@ def run(allconfig):
     process = DataPreprocess.DataPreprocess(dataconf=dataconf, process_num=allconfig['process_num'],
                                             target=allconfig['target'], \
                                             phonetype=allconfig['condition']['phonetype'],
-                                            phoneposition=allconfig['condition']['phoneposition'])
+                                            phoneposition=allconfig['condition']['phoneposition'],
+                                            activity=allconfig['condition']['activity'])
 
     x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard=False)
     if len(x_train) == 0:
