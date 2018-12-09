@@ -411,8 +411,8 @@ class ModelBuilder:
             self.test_time = datetime.datetime.now() - start_time
             self.test_size = len(X_test)
 
-            print "train time", self.train_time
-            print "test time", self.test_time
+            print "train time", self.train_time.seconds
+            print "test time", self.test_time.seconds
             print "train size", self.train_size
             print "test size", self.test_size
 
