@@ -80,7 +80,7 @@ class DataPreprocess:
                 logging.info("Load split data from %s" % segment_data_path)
 
 
-            total_data, total_label= self.read_hasc(segment_data_path, self.df.n_channels, self.df.n_steps, self.target, self.df.types)
+            total_data, total_label= self.read_hasc(segment_data_path, self.df.n_channels, self.df.n_steps, self.target, self.df.types, self.df.n_class)
             logging.info("Task type is %s and reset target is %s" % (self.df.types, self.target))
 
         RanSelf = np.random.permutation(total_data.shape[0])
@@ -254,7 +254,7 @@ class DataPreprocess:
         for process in record:
             process.join()
 
-    def read_hasc(self, data_path, n_channels, n_steps, target, types):
+    def read_hasc(self, data_path, n_channels, n_steps, target, types , n_class):
 
         X = np.empty((0, n_steps, n_channels))
         Y = list()
@@ -271,6 +271,7 @@ class DataPreprocess:
 
         Y = np.array(Y)
         Y = np.asarray(pd.get_dummies(np.array(Y)), dtype=np.int8)
+        assert Y[0].shape[0] == n_class
 
         return X, Y
 
