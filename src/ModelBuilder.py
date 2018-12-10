@@ -429,7 +429,7 @@ class ModelBuilder:
             cf_matrix = np.array(cf_matrix)
             np.savetxt(cf_matrix_path, cf_matrix, fmt = "%d")
 
-            res = [self.modelname, self.train_time, self.test_time, self.train_size, self.test_size, np.mean(test_acc), \
+            res = [self.modelname, self.train_time.seconds, self.test_time.seconds, self.train_size, self.test_size, np.mean(test_acc), \
                    precision_score(y_truelist, y_plist, average='weighted'),recall_score(y_truelist, y_plist, average='weighted'), \
                    f1_score(y_truelist, y_plist, average='weighted')]
             header = ["modelname","train time","test time","train size","test size","Test accuracy","Precision","Recall","f1_score"]
