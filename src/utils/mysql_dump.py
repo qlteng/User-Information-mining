@@ -52,22 +52,13 @@ def dump_from_mysql(store_path):
 
     DAL = mysqlDAL.mysqlDAL(host ='localhost', user ='other', passwd ='pkl239', db ='qltenghasc')
 
-    # sql = 'select Id,Person,Gender,Height,Weight,TerminalPosition,TerminalType,TerminalMount,Activity  \
-    #         from meta  \
-    #         where HasAcc=1  \
-    #         and HasGyro=1  \
-    #         and TerminalType in ("Samsung;Galaxy Nexus;AndroidOS 4.1;","Logger+Wifi for  Android;1.0","Samsung;NexusS;AndroidOS 4.1;")  \
-    #         and TerminalPosition in ("wear;outer;chest;left","strap;waist;rear","arm;right;hand","wear;pants;waist;fit;right-front","wear;pants;waist;fit;right-back","bag") \
-    #         or TerminalPosition regexp "^bag;position";'
+    #   for activity and attribute
+    #   no person in
 
-    # sql = 'select Id,Person,Gender,Generation,Height,Weight,TerminalPosition,TerminalType,TerminalMount,Activity \
-    #         from meta \
-    #         where HasAcc=1 \
-    #         and HasGyro=1 \
-    #         and TerminalPosition in \
-    #         (select TerminalPosition from meta where HasAcc=1 and HasGyro=1 group by TerminalPosition having count(*)>200) \
-    #         and TerminalType in \
-    #         (select TerminalType from meta where HasAcc=1 and HasGyro=1 group by TerminalType having count(*)>200);'
+    # for authentication:
+    #     person in 14 userlist on all activity
+    #     person in 95 userlist on walk whose has more than 10 samples
+
     sql = 'select Id,Person,Gender,Generation,Height,Weight,TerminalPosition,TerminalType,TerminalMount,Activity \
             from meta \
             where HasAcc=1 \
@@ -79,16 +70,19 @@ def dump_from_mysql(store_path):
             "wear;pants;waist;fit;left-front","wear;pants;waist;fit;right-back","wear;pants;waist;fit;right-front") \
             and TerminalType in \
             ("Logger+Wifi for Android;1.0","SAMSUNG; Galaxy Nexus; Android 4.1.2","Samsung;Galaxy Nexus;Android OS 4.1.2",\
-            "Samsung;Galaxy Nexus;AndroidOS 4.1;","Samsung;Nexus S;Android OS 4.1.2","Samsung;NexusS;AndroidOS 4.1;");'
-    # sql = 'select Id,Person,Gender,Generation,Height,Weight,TerminalPosition,TerminalType,TerminalMount,Activity \
-    #         from meta  \
-    #         where Activity="walk"  \
-    #         and HasAcc=1  \
-    #         and HasGyro=1 \
-    #         and TerminalPosition in \
-    #         (select TerminalPosition from meta where HasAcc=1 and HasGyro=1 group by TerminalPosition having count(*)>200) \
-    #         and TerminalType in (select TerminalType from meta where HasAcc=1 and HasGyro=1 group by TerminalType having count(*)>200) \
-    #         and Person in (select Person from meta where Activity="walk" and HasAcc=1 and HasGyro=1 group by Person having count(*)>10);'
+            "Samsung;Galaxy Nexus;AndroidOS 4.1;","Samsung;Nexus S;Android OS 4.1.2","Samsung;NexusS;AndroidOS 4.1;")\
+            and Activity in ("walk") \
+            and Person in \
+            (select Person from meta where HasAcc=1 and HasGyro=1 and Activity in ("walk") and TerminalPosition in \
+            ("arm;hand","arm;right;hand","bag","bag;position(fixed);backpack","bag;position(fixed);handback",\
+                "bag;position(fixed);messengerbag","bag;position(fixed);shoulderbag","strap;waist;rear","waist",\
+                "wear;outer;chest","wear;outer;chest;left","wear;outer;waist;front","wear;pants;front",\
+                "wear;pants;waist;fit;left-front","wear;pants;waist;fit;right-back","wear;pants;waist;fit;right-front") \
+                and TerminalType in \
+                ("Logger+Wifi for Android;1.0","SAMSUNG; Galaxy Nexus; Android 4.1.2","Samsung;Galaxy Nexus;Android OS 4.1.2",\
+                "Samsung;Galaxy Nexus;AndroidOS 4.1;","Samsung;Nexus S;Android OS 4.1.2","Samsung;NexusS;AndroidOS 4.1;") \
+                group by Person having count(*)>=10);'
+
 
     while True:
 
@@ -113,7 +107,7 @@ def dump_from_mysql(store_path):
         DAL.close()
         break
 
-# store_path = "../../data/hasc/sport_simple_data"
-# if not os.path.exists(store_path):
-#     os.mkdir(store_path)
-# dump_from_mysql(store_path)
+store_path = "../../data/hasc/human_walk_data"
+if not os.path.exists(store_path):
+    os.mkdir(store_path)
+dump_from_mysql(store_path)
