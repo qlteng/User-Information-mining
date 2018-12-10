@@ -121,19 +121,19 @@ class DataPreprocess:
                         label[i] = 1
                     elif float(Height) <=180:
                         label[i] = 2
-                    elif float(Height) >=181:
+                    elif float(Height) >180:
                         label[i] = 3
                     if label[i] not in [0,1,2,3]:
                         continue
 
                 elif target == 'weight':
-                    if float(Height) <=55:
+                    if float(Weight) <=55:
                         label[i] = 0
-                    elif float(Height) <=65:
+                    elif float(Weight) <65:
                         label[i] = 1
-                    elif float(Height) <=75:
+                    elif float(Weight) <=75:
                         label[i] = 2
-                    elif float(Height) >=76:
+                    elif float(Weight) >75:
                         label[i] = 3
                     if label[i] not in [0,1,2,3]:
                         continue
@@ -175,10 +175,8 @@ class DataPreprocess:
                                                   '50;early','50;late','60;early','60;late']:
                     continue
                 if tempdict['generation'] == '20;early':
-                    if random.random() > 0.005:
+                    if random.random() > 0.5:
                         continue
-
-
 
             if tempdict['activity'] not in ['jog','skip','stay','stDown','stUp','walk']:
                 continue
@@ -214,13 +212,6 @@ class DataPreprocess:
             if phoneposition != '' and phoneposition != tempdict['position']:
                 continue
 
-            # filter condition 2
-            # if phonetype != '' and phonetype not in label[x]:
-            #     continue
-            # if phoneposition != '' and phoneposition not in label[x]:
-            #     continue
-            # if activity != '' and activity not in label[x]:
-            #     continue
             label[x] = '#'.join([tempdict['person'], tempdict['gender'], tempdict['generation'], tempdict['height'], \
                                  tempdict['weight'], tempdict['position'], tempdict['type'], tempdict['mount'], tempdict['activity']])
 
@@ -228,7 +219,6 @@ class DataPreprocess:
             temp_data = np.empty((0, n_steps, n_channels))
 
             for (start, end) in self.windows(format_data['AX'], n_steps, overlap):
-                # ax, ay, az, gx, gy, gz = format_data[start : end]
 
                 ax = format_data['AX'][start : end]
                 ay = format_data['AY'][start : end]
@@ -326,9 +316,4 @@ class DataPreprocess:
         return X_train, X_test, X_vld
 
 
-# if __name__ == '__main__':
-#
-#     dataconf = DataConf.DataConf('har','reg')
-#     process = DataPreprocess()
-#     X_train, labels_train = process.read_har(data_path=dataconf.path, split="train")  # train
-#     X_test, labels_test = process.read_har(data_path=dataconf.path, split="test")  # test
+
