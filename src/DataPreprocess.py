@@ -163,8 +163,12 @@ class DataPreprocess:
             values = label[x].split('#')
             tempdict = dict(zip(keys,values))
 
-            if tempdict[target] == None:
-                continue
+            if self.df.types == 'recog':
+                if tempdict[target] == None:
+                    continue
+            elif self.df.types == 'authen':
+                if tempdict['person'] == None:
+                    continue
 
             if target == 'weight':
                 if tempdict['weight'] in [0, '0']:

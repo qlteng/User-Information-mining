@@ -107,7 +107,7 @@ def dump_from_mysql(store_path):
         DAL.close()
         break
 
-store_path = "../../data/hasc/human_walk_data"
-if not os.path.exists(store_path):
-    os.mkdir(store_path)
-dump_from_mysql(store_path)
+# store_path = "../../data/hasc/human_walk_data"
+# if not os.path.exists(store_path):
+#     os.mkdir(store_path)
+# dump_from_mysql(store_path)
