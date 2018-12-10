@@ -25,7 +25,7 @@ class ModelBuilder:
         self.modelpath = "../model/%s/%s/%s" % (self.types,target, modelname)
         if not os.path.exists(self.modelpath):
             os.makedirs(self.modelpath)
-        self.output = "../output/%s" % modelname
+        self.output = "../output/%s/%s/%s" % (self.types, self.target, modelname)
 
         self.train_time = 0
         self.test_time = 0
@@ -356,9 +356,8 @@ class ModelBuilder:
 
     def plot(self, iter, train_loss, train_acc, valid_loss, valid_acc):
 
-        path_prefix = "../output/%s/%s/%s" %(self.types, self.target, self.modelname)
-        if not os.path.exists(path_prefix):
-            os.makedirs(path_prefix)
+        if not os.path.exists(self.output):
+            os.makedirs(self.output)
         t = np.arange(iter - 1)
 
         plt.figure(figsize = (6,6))
@@ -366,14 +365,14 @@ class ModelBuilder:
         plt.xlabel("iteration")
         plt.ylabel("Loss")
         plt.legend(['train', 'validation'], loc='upper right')
-        plt.savefig("%s/loss.jpg" %path_prefix)
+        plt.savefig("%s/loss.jpg" % self.output)
 
         plt.figure(figsize = (6,6))
         plt.plot(t, np.array(train_acc), 'r-', t[t % 10 == 0], np.array(valid_acc), 'b*')
         plt.xlabel("iteration")
         plt.ylabel("Accuray")
         plt.legend(['train', 'validation'], loc='upper right')
-        plt.savefig("%s/acc.jpg" % path_prefix)
+        plt.savefig("%s/acc.jpg" % self.output)
 
     def get_batches(self, X, Y):
 
@@ -425,11 +424,11 @@ class ModelBuilder:
             print "confusion_matrix"
             cf_matrix = confusion_matrix(y_truelist, y_plist)
 
-            cf_matrix_path = "../output/%s/%s/%s/cf.txt"%(self.types,self.target,self.modelname)
+            cf_matrix_path = "%s/cf.txt"%self.output
             cf_matrix = np.array(cf_matrix)
             np.savetxt(cf_matrix_path, cf_matrix, fmt = "%d")
 
-            res = [self.modelname, self.train_time.seconds, self.test_time.seconds, self.train_size, self.test_size, np.mean(test_acc), \
+            res = [self.modelname, self.train_time, self.test_time, self.train_size, self.test_size, np.mean(test_acc), \
                    precision_score(y_truelist, y_plist, average='weighted'),recall_score(y_truelist, y_plist, average='weighted'), \
                    f1_score(y_truelist, y_plist, average='weighted')]
             header = ["modelname","train time","test time","train size","test size","Test accuracy","Precision","Recall","f1_score"]

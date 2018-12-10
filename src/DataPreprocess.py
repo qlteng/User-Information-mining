@@ -41,7 +41,6 @@ class DataPreprocess:
             total_label = np.concatenate((labels_train, labels_test), axis = 0)
 
         elif self.df.datasource == 'wisdm':
-
             pass
 
         elif self.df.datasource == 'hasc':
@@ -49,7 +48,7 @@ class DataPreprocess:
             if self.df.types == 'recog':
                 raw_data_path = "../data/hasc/sport_simple_data"
             elif self.df.types == 'authen':
-                raw_data_path = "../data/hasc/human_walk_data"
+                raw_data_path = "../data/hasc/human_data"
 
             if not os.path.exists(raw_data_path):
                 logging.warning("Raw data path %s doesn't exist" % raw_data_path)
@@ -108,8 +107,6 @@ class DataPreprocess:
 
                 if target == 'activity':
                     label[i] = Activity
-                elif target == 'person':
-                    label[i] = Person
                 elif target == 'gender':
                     label[i] = Gender
                 elif target == 'generation':
@@ -139,7 +136,11 @@ class DataPreprocess:
                         continue
 
             elif types == 'authen':
-                pass
+                if target == 'multi':
+                    label[i] = Person
+                elif target == 'binary':
+                    pass
+
 
         return label
 
@@ -158,7 +159,6 @@ class DataPreprocess:
 
         for x in raw_data:
             label[x] = label[x].decode().encode()
-            # filter condition 1
             keys = ['person', 'gender', 'generation', 'height', 'weight', 'position', 'type', 'mount', 'activity']
             values = label[x].split('#')
             tempdict = dict(zip(keys,values))
