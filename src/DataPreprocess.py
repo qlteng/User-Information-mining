@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from utils.mysql_dump import dump_from_mysql
+from utils.sample import sample
 
 LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
 logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
@@ -139,9 +140,10 @@ class DataPreprocess:
                 if target == 'multi':
                     label[i] = Person
                 elif target == 'binary':
-                    pass
-
-
+                    if Person == "person06010":
+                        label[i] = int(0)
+                    else:
+                        label[i] = int(1)
         return label
 
     def segment(self, index, raw_data_path, segment_data_path, n_steps, overlap, target, n_channels, phonetype, phoneposition, activity):
@@ -278,10 +280,14 @@ class DataPreprocess:
             X = np.vstack([X, temp_data])
             temp_label = np.load(store_label_file)
             temp_label = self.map2id(temp_label, target, types)
+            # print temp_label
             Y.extend(temp_label)
 
         Y = np.array(Y)
         print np.unique(Y)
+        if target == 'binary':
+
+            X,Y = sample(X,Y)
         Y = np.asarray(pd.get_dummies(np.array(Y)), dtype=np.int8)
         logging.info("Label has %d class"%Y[0].shape[0])
         assert Y[0].shape[0] == n_class
