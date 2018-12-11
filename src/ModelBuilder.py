@@ -428,17 +428,6 @@ class ModelBuilder:
             cf_matrix = np.array(cf_matrix)
             np.savetxt(cf_matrix_path, cf_matrix, fmt = "%d")
 
-            res = [self.modelname, self.train_time, self.test_time, self.train_size, self.test_size, np.mean(test_acc), \
-                   precision_score(y_truelist, y_plist, average='weighted'),recall_score(y_truelist, y_plist, average='weighted'), \
-                   f1_score(y_truelist, y_plist, average='weighted')]
-            header = ["modelname","train time","test time","train size","test size","Test accuracy","Precision","Recall","f1_score"]
-            res_csv = "../output/%s/%s/res.csv" % (self.types, self.target)
-            res = pd.DataFrame([res])
-            if not os.path.exists(res_csv):
-                res.to_csv(res_csv, header = header, index = False, mode = "a+")
-            else:
-                res.to_csv(res_csv, header = False, index = False, mode = "a+")
-
             if ROC == True:
 
                 y_prob = np.array(y_problist)
@@ -459,12 +448,45 @@ class ModelBuilder:
                 fpr = np.insert(fpr, 0, 0)
                 tpr = np.insert(tpr, 0 ,0)
 
+                fpr_path = "%s/fpr.npy" % self.output
+                tpr_path = "%s/tpr.npy" % self.output
+
+                np.save(fpr_path, fpr)
+                np.save(tpr_path, tpr)
+
+
+                plt.figure(figsize=(6, 6))
                 plt.plot([0, 1], [0, 1], '--', color = (0.6, 0.6, 0.6))
                 plt.plot(fpr, tpr, 'b-')
                 plt.xlabel("False Positive Rate")
                 plt.ylabel("True Positiove Rate")
                 plt.title("ROC")
                 plt.legend(loc = "lower right")
-                plt.show()
+                plt.savefig("%s/eer.jpg" % self.output)
+
+                res = [self.modelname, self.train_time, self.test_time, self.train_size, self.test_size, np.mean(test_acc),
+                       precision_score(y_truelist, y_plist, average='weighted'),
+                       recall_score(y_truelist, y_plist, average='weighted'),
+                       f1_score(y_truelist, y_plist, average='weighted'),roc_auc,cf_matrix[1][0] / float(sum(cf_matrix[1])),
+                       cf_matrix[0][1] / float(sum(cf_matrix[0])),EER]
+                header = ["modelname", "train time", "test time", "train size", "test size", "Test accuracy", "Precision",
+                          "Recall", "f1_score","AUC","FRR","FAR","EER"]
+
+            else:
+                res = [self.modelname, self.train_time, self.test_time, self.train_size, self.test_size,
+                       np.mean(test_acc),
+                       precision_score(y_truelist, y_plist, average='weighted'),
+                       recall_score(y_truelist, y_plist, average='weighted'),
+                       f1_score(y_truelist, y_plist, average='weighted')]
+                header = ["modelname", "train time", "test time", "train size", "test size", "Test accuracy",
+                          "Precision", "Recall", "f1_score"]
+
+            res_csv = "../output/%s/%s/res.csv" % (self.types, self.target)
+            res = pd.DataFrame([res])
+
+            if not os.path.exists(res_csv):
+                res.to_csv(res_csv, header=header, index=False, mode="a+")
+            else:
+                res.to_csv(res_csv, header=False, index=False, mode="a+")
 
 

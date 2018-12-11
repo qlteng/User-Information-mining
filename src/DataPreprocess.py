@@ -88,8 +88,8 @@ class DataPreprocess:
         total_data = total_data[RanSelf]
         total_label = total_label[RanSelf]
 
-        x_train, x_test, y_train, y_test = train_test_split(total_data, total_label, test_size = 0.25, random_state = 123)
-        x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size = 0.33, random_state = 456)
+        x_train, x_test, y_train, y_test = train_test_split(total_data, total_label, test_size = 0.20, random_state = 123)
+        x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size = 0.25, random_state = 456)
         logging.info("Split train、valid、test set")
 
         if standard == True:
