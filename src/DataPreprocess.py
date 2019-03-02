@@ -212,7 +212,7 @@ class DataPreprocess:
 
             elif tempdict['position'] in ['wear;outer;chest','wear;outer;chest;left']:
                 tempdict['position'] = 'chest'
-                
+
             if tempdict['position'] not in ['arm','bag','waist','chest']:
                 continue
             if phoneposition != '' and phoneposition != tempdict['position']:
@@ -280,11 +280,9 @@ class DataPreprocess:
             X = np.vstack([X, temp_data])
             temp_label = np.load(store_label_file)
             temp_label = self.map2id(temp_label, target, types)
-            # print temp_label
             Y.extend(temp_label)
 
         Y = np.array(Y)
-        print np.unique(Y)
         if target == 'binary':
 
             X,Y = sample(X,Y)

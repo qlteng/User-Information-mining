@@ -1,12 +1,12 @@
 # coding: utf-8
 
-import numpy as np
 import logging
 import multiprocessing
 import DataConf
 import DataPreprocess
 import ModelConf
 import ModelBuilder
+from utils.parse import config_parse
 
 LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
 logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
@@ -14,60 +14,48 @@ logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
 
 TerminalType = ["Logger+Wifi for Android;1.0", "NexusS", "Nexus"]
 TerminalPosition = ['arm','bag','waist','chest','']
-
-# TerminalPosition = ["wear;outer;chest;left","arm;right;hand","wear;pants;waist;fit;right-front",
-#                     "wear;pants;waist;fit;right-back","bag;position(fixed);shoulderbag","bag;position(fixed);handback"
-#                     "bag;position(fixed);messengerbag", "bag;position(fixed);backpack"]
-
 Activity = ['jog','skip','stay','stDown','stUp','walk']
+Person = ["person06010","person06011","person06012","person06013","person06014",\
+          "person06015","person06016","person06017","person06018","person06019",\
+          "person06020","person06021","person06022","person06023"]
 
 
-def run(allconfig):
+def run(path):
 
-    dataconf = DataConf.DataConf(datasource=allconfig['datasource'], types=allconfig['types'],
-                                 n_steps=allconfig['n_steps'], \
-                                 n_channels=allconfig['n_channel'], n_class=allconfig['n_class'],
-                                 overlap=allconfig['overlap'])
+    datasource, types, n_steps, n_channel, n_class, overlap, target, process_num, filter = config_parse(path)
+    modelname_prefix = '_'.join([datasource, n_steps, n_channel, n_class, overlap, target, filter['phonetype'], filter['phoneposition'], filter['activity']])
+    n_steps, n_channel, n_class, process_num = map(lambda x : int(x), [n_steps, n_channel, n_class, process_num])
 
-    process = DataPreprocess.DataPreprocess(dataconf=dataconf, process_num=allconfig['process_num'],
-                                            target=allconfig['target'], \
-                                            phonetype=allconfig['condition']['phonetype'],
-                                            phoneposition=allconfig['condition']['phoneposition'],
-                                            activity=allconfig['condition']['activity'])
+    dataconf = DataConf.DataConf(datasource, types, n_steps, n_channel, n_class, float(overlap))
+
+    process = DataPreprocess.DataPreprocess(dataconf, process_num,target,filter['phonetype'],filter['phoneposition'],filter['activity'])
 
     x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard=False)
     if len(x_train) == 0:
         return
-
-    modelname_prefix = '%s_%s_T_%s_P_%s_A_%s_%d_%d_%d_%0.1f' % (allconfig['datasource'], allconfig['target'], \
-                                                        allconfig['condition']['phonetype'],
-                                                         allconfig['condition']['phoneposition'],
-                                                         allconfig['condition']['activity'], \
-                                                         allconfig['n_class'], allconfig['n_steps'],
-                                                         allconfig['n_channel'], allconfig['overlap'])
-
-    # for model in ['cnn', 'vgglstm', 'lstm', 'bilstm','vgg']:
-    # for model in ['cnn', 'vgglstm', 'vgg']:
-    # model = 'lstm'
-    # modelname = "%s#%s" % (model, modelname_prefix)
-    # modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=400, learning_rate=0.0001, epochs=50)
-    # modelbuild = ModelBuilder.ModelBuilder(modelconf, modelname, allconfig['target'])
-    # modelbuild.train_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
-    # modelbuild.test(x_test, y_test, ROC=False)
-
+    '''
+    #for model in ['cnn', 'vgglstm', 'lstm', 'bilstm','vgg']:
+    #for model in ['cnn', 'vgglstm', 'vgg']:
+    model = 'cnn'
+    modelname = "%s#%s" % (model, modelname_prefix)
+    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=400, learning_rate=0.0001, epochs=50)
+    modelbuild = ModelBuilder.ModelBuilder(modelconf, modelname, allconfig['target'])
+    modelbuild.train_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
+    modelbuild.test(x_test, y_test, ROC=False)
+    '''
     record = []
-    for model in ['cnn','vgglstm','vgg']:
-        p = multiprocessing.Process(target=para_train, args=(model, modelname_prefix, dataconf, x_train, y_train, x_valid, y_valid, x_test, y_test))
+    for model in ['cnn','vgglstm','vgg','lstm']:
+        p = multiprocessing.Process(target=para_train, args=(model, modelname_prefix, dataconf, target, x_train, y_train, x_valid, y_valid, x_test, y_test))
         p.start()
         record.append(p)
     for process in record:
         process.join()
-#
-def para_train(model, modelname_prefix, dataconf,x_train, y_train, x_valid, y_valid, x_test, y_test):
+
+def para_train(model, modelname_prefix, dataconf, target, x_train, y_train, x_valid, y_valid, x_test, y_test):
 
     modelname = "%s#%s"% (model,modelname_prefix)
     modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=600, learning_rate=0.0001, epochs=50)
-    modelbuild = ModelBuilder.ModelBuilder(modelconf, modelname, allconfig['target'])
+    modelbuild = ModelBuilder.ModelBuilder(modelconf, modelname, target)
     if model == 'cnn':
 
         modelbuild.train_cnn(x_train, y_train, x_valid, y_valid, figplot=True)
@@ -80,16 +68,20 @@ def para_train(model, modelname_prefix, dataconf,x_train, y_train, x_valid, y_va
 
         modelbuild.train_vgg(x_train, y_train, x_valid, y_valid, figplot=True)
         modelbuild.test(x_test, y_test, ROC=False)
+    elif model == 'lstm':
+        modelbuild.train_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
+        modelbuild.test(x_test, y_test, ROC=False)
+
+def main():
+    path = './model.conf'
+    run(path)
 
 if __name__ == '__main__':
 
+    main()
 
-    allconfig = {'datasource': 'hasc', 'types': 'recog', 'n_steps': 256, 'n_channel':6, \
-              'n_class': 10, 'overlap': 0.5, 'target': 'generation', 'process_num' : 40, \
-              'condition' : {'phonetype' : "", 'phoneposition' : '', 'activity' : 'walk'}}
-    run(allconfig)
-    # for position in TerminalPosition:
-    #     allconfig['condition']['phoneposition'] = position
+    # for pos in TerminalPosition:
+    #     allconfig['condition']['phoneposition'] = pos
     #     run(allconfig)
 
 

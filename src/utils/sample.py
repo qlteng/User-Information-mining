@@ -7,7 +7,6 @@ logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
 
 def sample(X,Y):
 
-
     indexs = np.argwhere(Y == '0').T[0]
     neg_sample_index = np.argwhere(Y == '1').T[0]
     neg_num = len(neg_sample_index)
