@@ -25,13 +25,12 @@ def run(path):
     datasource, types, n_steps, n_channel, n_class, overlap, target, process_num, filter = config_parse(path)
     modelname_prefix = '_'.join([datasource, n_steps, n_channel, n_class, overlap, target, filter['phonetype'], filter['phoneposition'], filter['activity']])
     n_steps, n_channel, n_class, process_num = map(lambda x : int(x), [n_steps, n_channel, n_class, process_num])
-
     dataconf = DataConf.DataConf(datasource, types, n_steps, n_channel, n_class, float(overlap))
-
-    process = DataPreprocess.DataPreprocess(dataconf, process_num,target,filter['phonetype'],filter['phoneposition'],filter['activity'])
+    process = DataPreprocess.DataPreprocess(dataconf, process_num, target, phonetype = filter['phonetype'], phoneposition = filter['phoneposition'], activity = filter['activity'])
 
     x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard=False)
-    if len(x_train) == 0:
+    # print y_train
+    if len(y_train) == 0:
         return
     '''
     #for model in ['cnn', 'vgglstm', 'lstm', 'bilstm','vgg']:
@@ -44,7 +43,7 @@ def run(path):
     modelbuild.test(x_test, y_test, ROC=False)
     '''
     record = []
-    for model in ['cnn','vgglstm','vgg','lstm']:
+    for model in ['cnn','vgglstm','vgg']:
         p = multiprocessing.Process(target=para_train, args=(model, modelname_prefix, dataconf, target, x_train, y_train, x_valid, y_valid, x_test, y_test))
         p.start()
         record.append(p)

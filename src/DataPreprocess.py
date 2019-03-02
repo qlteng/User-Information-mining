@@ -88,8 +88,10 @@ class DataPreprocess:
         total_data = total_data[RanSelf]
         total_label = total_label[RanSelf]
 
+        #  split users as 1:1:3 for train、valid、test
         x_train, x_test, y_train, y_test = train_test_split(total_data, total_label, test_size = 0.20, random_state = 123)
         x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size = 0.25, random_state = 456)
+        # x_train, x_valid, x_test, y_train, y_valid, y_test = [x in y for (x,y) in zip(lambda  t : total_label,[x_train, x_valid, x_test, y_train, y_valid, y_test])]
         logging.info("Split train、valid、test set")
 
         if standard == True:
@@ -113,28 +115,9 @@ class DataPreprocess:
                 elif target == 'generation':
                     label[i] = Generation
                 elif target == 'height':
-                    if float(Height) <=160:
-                        label[i] = 0
-                    elif float(Height) <=170:
-                        label[i] = 1
-                    elif float(Height) <=180:
-                        label[i] = 2
-                    elif float(Height) >180:
-                        label[i] = 3
-                    if label[i] not in [0,1,2,3]:
-                        continue
-
+                    label[i] = Height
                 elif target == 'weight':
-                    if float(Weight) <=55:
-                        label[i] = 0
-                    elif float(Weight) <65:
-                        label[i] = 1
-                    elif float(Weight) <=75:
-                        label[i] = 2
-                    elif float(Weight) >75:
-                        label[i] = 3
-                    if label[i] not in [0,1,2,3]:
-                        continue
+                    label[i] = Weight
 
             elif types == 'authen':
                 if target == 'multi':
@@ -160,7 +143,7 @@ class DataPreprocess:
         attr_labels = list()
 
         for x in raw_data:
-            label[x] = label[x].decode().encode()
+            label[x] = label[x].encode()
             keys = ['person', 'gender', 'generation', 'height', 'weight', 'position', 'type', 'mount', 'activity']
             values = label[x].split('#')
             tempdict = dict(zip(keys,values))
@@ -174,6 +157,30 @@ class DataPreprocess:
 
             if target == 'weight':
                 if tempdict['weight'] in [0, '0']:
+                    continue
+                if float(tempdict['weight']) <= 55:
+                    tempdict['weight'] = 0
+                elif float(tempdict['weight']) < 65:
+                    tempdict['weight'] = 1
+                elif float(tempdict['weight']) <= 75:
+                    tempdict['weight'] = 2
+                elif float(tempdict['weight']) > 75:
+                    tempdict['weight'] = 3
+                if tempdict['weight'] not in [0, 1, 2, 3]:
+                    continue
+
+            if target == 'height':
+                if tempdict['height'] in [0, '0']:
+                    continue
+                if float(tempdict['height']) <= 160:
+                    tempdict['height'] = 0
+                elif float(tempdict['height']) <= 170:
+                    tempdict['height'] = 1
+                elif float(tempdict['height']) <= 180:
+                    tempdict['height'] = 2
+                elif float(tempdict['height']) > 180:
+                    tempdict['height'] = 3
+                if tempdict['height'] not in [0, 1, 2, 3]:
                     continue
 
             if target == 'generation':
@@ -212,14 +219,14 @@ class DataPreprocess:
 
             elif tempdict['position'] in ['wear;outer;chest','wear;outer;chest;left']:
                 tempdict['position'] = 'chest'
-
+                
             if tempdict['position'] not in ['arm','bag','waist','chest']:
                 continue
             if phoneposition != '' and phoneposition != tempdict['position']:
                 continue
 
-            label[x] = '#'.join([tempdict['person'], tempdict['gender'], tempdict['generation'], tempdict['height'], \
-                                 tempdict['weight'], tempdict['position'], tempdict['type'], tempdict['mount'], tempdict['activity']])
+            label[x] = '#'.join([tempdict['person'], tempdict['gender'], tempdict['generation'], str(tempdict['height']), \
+                                 str(tempdict['weight']), tempdict['position'], tempdict['type'], tempdict['mount'], tempdict['activity']])
 
             format_data = pd.DataFrame(list(raw_data[x]), columns=['AX', 'AY', 'AZ', 'GX', 'GY', 'GZ'])
             temp_data = np.empty((0, n_steps, n_channels))
@@ -283,6 +290,7 @@ class DataPreprocess:
             Y.extend(temp_label)
 
         Y = np.array(Y)
+        print np.unique(Y)
         if target == 'binary':
 
             X,Y = sample(X,Y)
@@ -320,7 +328,6 @@ class DataPreprocess:
         X_train = (train - np.mean(train, axis=0)[None, :, :]) / np.std(train, axis=0)[None, :, :]
         X_vld = (valid - np.mean(valid, axis=0)[None, :, :]) / np.std(valid, axis=0)[None, :, :]
         X_test = (test - np.mean(test, axis=0)[None, :, :]) / np.std(test, axis=0)[None, :, :]
-
         return X_train, X_test, X_vld
 
 
