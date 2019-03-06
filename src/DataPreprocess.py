@@ -290,7 +290,6 @@ class DataPreprocess:
             Y.extend(temp_label)
 
         Y = np.array(Y)
-        print np.unique(Y)
         if target == 'binary':
 
             X,Y = sample(X,Y)
