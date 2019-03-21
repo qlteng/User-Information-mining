@@ -43,129 +43,31 @@ class Keras_ModelBuilder:
         self.test_size = 10
         self.saver = None
 
-    def train_para_crnn(self, x_train, y_train, x_valid, y_valid, figplot = False):
-        n_channel = self.conf.n_channels
-        ip = Input(shape=(n_channel, self.conf.n_steps))
-
-        x = LSTM(32)(ip)
-        # x = AttentionLSTM(32)(ip)
-        x = Dropout(0.8)(x)
-
-        y = Permute((2, 1))(ip)
-        y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        y = BatchNormalization()(y)
-        y = Activation('relu')(y)
-
-        y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        y = BatchNormalization()(y)
-        y = Activation('relu')(y)
-        # y = squeeze_excite_block(y)
-
-        y = Conv1D(8 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        y = BatchNormalization()(y)
-        y = Activation('relu')(y)
-
-        y = GlobalAveragePooling1D()(y)
-
-        x = concatenate([x, y])
-
-        out = Dense(self.conf.n_class, activation='softmax')(x)
-
-        model = Model(ip, out)
-        # add load model code here to fine-tune
-        self.run(model, x_train, y_train, x_valid, y_valid, None, "para_crnn", figplot)
-
-    def train_lstm(self, x_train, y_train, x_valid, y_valid, figplot = False):
-
-        n_channel = self.conf.n_channels
-        ip = Input(shape=(n_channel, self.conf.n_steps))
-
-        x = LSTM(32)(ip)
-        x = Dropout(0.8)(x)
-
-        out = Dense(self.conf.n_class, activation='sigmoid')(x)
-
-        model = Model(ip, out)
-
-        self.run(model, x_train, y_train, x_valid, y_valid, None, "lstm", figplot)
-
     def train_vgg_lstm(self, x_train, y_train, x_valid, y_valid, figplot = False):
-        n_channel = self.conf.n_channels
-        ip = Input(shape=(n_channel, self.conf.n_steps))
-        y = Permute((2, 1))(ip)
-        y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        y = MaxPooling1D(pool_size=2, strides=2, padding='same')(y)
-        y = BatchNormalization()(y)
-        y = Activation('relu')(y)
-        y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        y = MaxPooling1D(pool_size=2, strides=2, padding='same')(y)
-        y = BatchNormalization()(y)
-        y = Activation('relu')(y)
-        # y = self.squeeze_excite_block(y)
-        n_ch = 4 * n_channel
-        # inner = Reshape(target_shape = ((-1 , n_ch)))(y)
-        y = Permute((2,1))(y)
-        y = LSTM(32, return_sequences= True)(y)
-        y = Dropout(0.5)(y)
-        y = LSTM(32, return_sequences= False)(y)
-        # lstm1 = LSTM(32, kernel_initializer='he_normal')(inner)
-        # lstm2 = LSTM(32, go_backwards=True, kernel_initializer='he_normal')(inner)
-        # lstm_merged = add([lstm1, lstm2])
-        # lstm_merged = BatchNormalization()(lstm_merged)
 
-        out = Dense(self.conf.n_class, activation='sigmoid')(y)
+        ip = Input(shape=(self.conf.n_steps,n_channel),name = 'input')
+
+        y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform', name = 'conv11')(ip)
+        y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform',name = 'conv12')(y)
+        y = MaxPooling1D(pool_size=2, strides=2, padding='same',name = 'maxpool1')(y)
+
+        y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform',name = 'conv21')(y)
+        y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform',name = 'conv22')(y)
+        y = MaxPooling1D(pool_size=2, strides=2, padding='same',name = 'maxpool2')(y)
+        # y = LSTM(32, return_sequences= True)(y)
+        # y = Dropout(0.5)(y)
+        y = LSTM(128, return_sequences= False,name='lstm')(y)
+        out = Dense(32, activation='sigmoid',name='densea')(y)
+        out = Dense(self.conf.n_class, activation='softmax',name='denseb')(out)
         model = Model(ip, out)
         model.summary()
 
         plot_model(model, to_file='model1.png', show_shapes=True)
         self.run(model, x_train, y_train, x_valid, y_valid, None, "keras_cnn_lstm", figplot)
 
-    def train_lstm_attention(self, x_train, y_train, x_valid, y_valid, figplot = False):
-        n_channel = self.conf.n_channels
-        ip = Input(shape=(n_channel, self.conf.n_steps))
-        x = AttentionLSTM(32)(ip)
-        x = Dropout(0.8)(x)
-        out = Dense(self.conf.n_class, activation='softmax')(x)
-
-        model = Model(ip, out)
-        self.run(model, x_train, y_train, x_valid, y_valid, None, "lstm_attention", figplot)
-
-    def train_cnn_attention(self, x_train, y_train, x_valid, y_valid, figplot = False):
-
-        n_channel = self.conf.n_channels
-        ip = Input(shape=(n_channel, self.conf.n_steps))
-        y = Permute((2, 1))(ip)
-        y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        # y = MaxPooling1D(pool_size = 2, strides = 2, padding = 'same')(y)
-        y = BatchNormalization()(y)
-        y = Activation('relu')(y)
-        y = self.squeeze_excite_block(y)
-
-        y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        # y = MaxPooling1D(pool_size=2, strides=2, padding='same')(y)
-        y = BatchNormalization()(y)
-        y = Activation('relu')(y)
-        y = self.squeeze_excite_block(y)
-
-        y = Conv1D(8 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        # y = MaxPooling1D(pool_size=2, strides=2, padding='same')(y)
-        y = BatchNormalization()(y)
-        y = Activation('relu')(y)
-
-        y = GlobalAveragePooling1D()(y)
-
-        out = Dense(self.conf.n_class, activation='sigmoid')(y)
-
-        model = Model(ip, out)
-
-        self.run(model, x_train, y_train, x_valid, y_valid, None, "cnn_attention", figplot)
-
     def run(self, model, x_train, y_train, x_valid, y_valid, cell, type, figplot = False):
 
-        x_train = np.array([d.T for d in x_train])
-        x_valid = np.array([d.T for d in x_valid])
+
 
         optm = Adam(lr=1e-3)
         model.compile(optimizer=optm, loss='categorical_crossentropy', metrics=['accuracy'])
@@ -179,6 +81,7 @@ class Keras_ModelBuilder:
                   callbacks=[history])
         self.train_time = datetime.datetime.now() - start_time
         self.train_size = len(x_train)
+        model.save_weights("%s/model_weight.hdf5"%self.modelpath)
         model.save("%s/model.h5" % self.modelpath)
         if type == 'lstm_attention':
             self.saver = model
@@ -196,7 +99,7 @@ class Keras_ModelBuilder:
 
     def test(self, x_test, y_test, type, ROC = False):
 
-        x_test = np.array([d.T for d in x_test])
+
         model = None
         if type == 'lstm_attention':
             model = self.saver
@@ -275,7 +178,7 @@ class LossHistory(keras.callbacks.Callback):
 if __name__ == '__main__':
 
 
-    model = "Keras-CNN"
+    model = "har_before_transfer"
     path = "./model.conf"
     datasource, types, n_steps, n_channel, n_class, overlap, target, process_num, filter = config_parse(path)
     modelname_prefix = '_'.join(
@@ -289,28 +192,9 @@ if __name__ == '__main__':
     x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard=False)
 
     modelname = "%s#%s" % (model, modelname_prefix)
-    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=300, learning_rate=0.0001, epochs=200)
+    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=300, learning_rate=0.0001, epochs=50)
+
+
     modelbuild = Keras_ModelBuilder(modelconf, modelname, target)
     modelbuild.train_vgg_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
     modelbuild.test(x_test, y_test, 'vgg_lstm', ROC=False)
-    #
-    # ip = Input(shape=(6, 256))
-    # x = AttentionLSTM(32)(ip)
-    # x = Dropout(0.8)(x)
-    # out = Dense(6, activation='softmax')(x)
-    # model = Model(ip, out)
-    # x_train = np.array([d.T for d in x_train])
-    # x_valid = np.array([d.T for d in x_valid])
-    # x_test = np.array([d.T for d in x_test])
-    # optm = Adam(lr=1e-3)
-    # model.compile(optimizer=optm, loss='categorical_crossentropy', metrics=['accuracy'])
-    # history = LossHistory()
-    # model.fit(x_train, y_train,
-    #           batch_size=600,
-    #           epochs=10,
-    #           verbose=0,
-    #           validation_data=(x_valid, y_valid),
-    #           callbacks=[history])
-    # pred = model.predict(x_test)
-    # print [x.argmax() for x in pred]
-

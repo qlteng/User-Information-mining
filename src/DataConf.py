@@ -21,7 +21,7 @@ class DataConf:
             self.path = '../data/har/'
             self.n_steps = 128
             self.n_class = 6
-            self.n_channels = 9
+            self.n_channels = 6
 
         elif self.datasource == 'wisdm':
             pass
