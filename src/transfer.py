@@ -23,6 +23,7 @@ from keras.utils.vis_utils import plot_model
 LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
 logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
 
+os.environ['CUDA_VISIBLE_DEVICES'] = '8'
 class Keras_ModelBuilder:
 
     def __init__(self, modelconf, modelname, target):
@@ -45,6 +46,7 @@ class Keras_ModelBuilder:
 
     def train_vgg_lstm(self, x_train, y_train, x_valid, y_valid, figplot = False):
 
+        n_channel = self.conf.n_channels
         ip = Input(shape=(self.conf.n_steps,n_channel),name = 'input')
 
         y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform', name = 'conv11')(ip)
@@ -56,10 +58,38 @@ class Keras_ModelBuilder:
         y = MaxPooling1D(pool_size=2, strides=2, padding='same',name = 'maxpool2')(y)
         # y = LSTM(32, return_sequences= True)(y)
         # y = Dropout(0.5)(y)
-        y = LSTM(128, return_sequences= False,name='lstm')(y)
+        y = LSTM(32, return_sequences= False,name='lstm')(y)
         out = Dense(32, activation='sigmoid',name='densea')(y)
         out = Dense(self.conf.n_class, activation='softmax',name='denseb')(out)
         model = Model(ip, out)
+        model.summary()
+
+        plot_model(model, to_file='model1.png', show_shapes=True)
+        self.run(model, x_train, y_train, x_valid, y_valid, None, "keras_cnn_lstm", figplot)
+
+    def reload_vgg_lstm(self, x_train, y_train, x_valid, y_valid, model_weight, figplot = False):
+
+        n_channel = self.conf.n_channels
+        ip = Input(shape=(self.conf.n_steps, n_channel), name='input')
+
+        y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform', name='conv11')(
+            ip)
+        y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform', name='conv12')(
+            y)
+        y = MaxPooling1D(pool_size=2, strides=2, padding='same', name='maxpool1')(y)
+
+        y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform', name='conv21')(
+            y)
+        y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform', name='conv22')(
+            y)
+        y = MaxPooling1D(pool_size=2, strides=2, padding='same', name='maxpool2')(y)
+        # y = LSTM(32, return_sequences= True)(y)
+        # y = Dropout(0.5)(y)
+        y = LSTM(32, return_sequences=False, name='lstm')(y)
+        out = Dense(32, activation='sigmoid', name='dense1')(y)
+        out = Dense(self.conf.n_class, activation='softmax', name='dense2')(out)
+        model = Model(ip, out)
+        model.load_weights("%s/model_weight.hdf5"%model_weight)
         model.summary()
 
         plot_model(model, to_file='model1.png', show_shapes=True)
@@ -81,7 +111,9 @@ class Keras_ModelBuilder:
                   callbacks=[history])
         self.train_time = datetime.datetime.now() - start_time
         self.train_size = len(x_train)
-        model.save_weights("%s/model_weight.hdf5"%self.modelpath)
+        weight_path = "%s/model_weight.hdf5"%self.modelpath
+        if not os.path.isfile(weight_path):
+            model.save_weights(weight_path)
         model.save("%s/model.h5" % self.modelpath)
         if type == 'lstm_attention':
             self.saver = model
@@ -192,9 +224,27 @@ if __name__ == '__main__':
     x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard=False)
 
     modelname = "%s#%s" % (model, modelname_prefix)
-    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=300, learning_rate=0.0001, epochs=50)
-
+    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=300, learning_rate=0.0001, epochs=70)
 
     modelbuild = Keras_ModelBuilder(modelconf, modelname, target)
+
     modelbuild.train_vgg_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
-    modelbuild.test(x_test, y_test, 'vgg_lstm', ROC=False)
+    modelbuild.test(x_test, y_test, 'transfer_before_vgg_lstm', ROC=False)
+
+
+    model = "hasc_after_transfer"
+    datasource, types, n_steps, n_channel, n_class, overlap, target, process_num, filter = config_parse(path)
+    datasource = 'hasc'
+    modelname_prefix = '_'.join(
+        [datasource, n_steps, n_channel, n_class, overlap, target, filter['phonetype'], filter['phoneposition'],
+         filter['activity']])
+    n_steps, n_channel, n_class, process_num = map(lambda x: int(x), [n_steps, n_channel, n_class, process_num])
+    dataconf = DataConf.DataConf(datasource, types, n_steps, n_channel, n_class, float(overlap))
+    process = DataPreprocess.DataPreprocess(dataconf, process_num, target, phonetype=filter['phonetype'],
+                                            phoneposition=filter['phoneposition'], activity=filter['activity'])
+    x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard=False)
+    modelname = "%s#%s" % (model, modelname_prefix)
+    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=300, learning_rate=0.0001, epochs=70)
+    model_weight = modelbuild.modelpath
+    modelbuild.reload_vgg_lstm(x_train, y_train, x_valid, y_valid, model_weight, figplot=True)
+    modelbuild.test(x_test, y_test, 'transfer_after_vgg_lstm', ROC=False)

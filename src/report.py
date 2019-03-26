@@ -6,9 +6,10 @@ import numpy as np
 import pandas as pd
 import logging
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 import keras
-from keras.models import Model
-from keras.layers import Input, Dense, LSTM, multiply, concatenate, Activation, Masking, Reshape, add
+from keras.models import Model,Sequential
+from keras.layers import Input, Dense, LSTM, multiply, concatenate, Activation, Masking, Reshape, add,Flatten
 from keras.layers import Conv1D, BatchNormalization, GlobalAveragePooling1D, Permute, Dropout, MaxPooling1D
 from keras.optimizers import Adam
 from keras.models import load_model
@@ -22,6 +23,7 @@ from keras.utils.vis_utils import plot_model
 
 LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
 logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
+os.environ['CUDA_VISIBLE_DEVICES'] = '7'
 
 class Keras_ModelBuilder:
 
@@ -43,7 +45,7 @@ class Keras_ModelBuilder:
         self.test_size = 10
         self.saver = None
 
-    def train_vgg_lstm(self, x_train, y_train, x_valid, y_valid, figplot = False):
+    def train_cnn(self, x_train, y_train, x_valid, y_valid, figplot = False):
         n_channel = self.conf.n_channels
         ip = Input(shape=(n_channel, self.conf.n_steps))
         y = Permute((2, 1))(ip)
@@ -55,29 +57,40 @@ class Keras_ModelBuilder:
         y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
         y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
         y = MaxPooling1D(pool_size=2, strides=2, padding='same')(y)
-        # y = BatchNormalization()(y)
-        # y = Activation('relu')(y)
-        # y = self.squeeze_excite_block(y)
-        # n_ch = 4 * n_channel
-        # inner = Reshape(target_shape = ((-1 , n_ch)))(y)
-        # y = Permute((2,1))(y)
-        # y = LSTM(32, return_sequences= True)(y)
-        # y = Dropout(0.5)(y)
-        y = LSTM(32, return_sequences= False)(y)
-        # lstm1 = LSTM(32, kernel_initializer='he_normal')(inner)
-        # lstm2 = LSTM(32, go_backwards=True, kernel_initializer='he_normal')(inner)
-        # lstm_merged = add([lstm1, lstm2])
-        # lstm_merged = BatchNormalization()(lstm_merged)
-        # y = Dense(64)(y)
-        # y = GlobalAveragePooling1D()(y)
-        # out = Dense(16, activation='sigmoid')(y)
-        # y = Dropout(0.5)(y)
+        # y = Flatten()(y)
+        y = LSTM(32, return_sequences=False, name='lstm')(y)
+        y = Dense(32, activation='sigmoid')(y)
+        y = Dropout(0.5)(y)
         out = Dense(self.conf.n_class, activation='softmax')(y)
         model = Model(ip, out)
-        model.summary()
+        # model.summary()
 
         plot_model(model, to_file='model1.png', show_shapes=True)
         self.run(model, x_train, y_train, x_valid, y_valid, None, "keras_cnn_lstm", figplot)
+
+    def reload_cnn2svm(self):
+
+        n_channel = self.conf.n_channels
+        ip = Input(shape=(n_channel, self.conf.n_steps))
+        y = Permute((2, 1))(ip)
+        y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
+        y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
+        y = MaxPooling1D(pool_size=2, strides=2, padding='same')(y)
+        # y = BatchNormalization()(y)
+        # y = Activation('relu')(y)
+        y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
+        y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
+        y = MaxPooling1D(pool_size=2, strides=2, padding='same')(y)
+        y = LSTM(32, return_sequences=False, name='lstm')(y)
+        y = Dense(32, activation='sigmoid')(y)
+        y = Dropout(0.5)(y)
+        out = Dense(self.conf.n_class, activation='softmax')(y)
+        model = Model(ip, out)
+        model.load_weights("%s/model_weight.hdf5" % self.modelpath)
+        model.trainable = False
+
+
+        return model
 
     def run(self, model, x_train, y_train, x_valid, y_valid, cell, type, figplot = False):
 
@@ -96,7 +109,12 @@ class Keras_ModelBuilder:
                   callbacks=[history])
         self.train_time = datetime.datetime.now() - start_time
         self.train_size = len(x_train)
+        weight_path = "%s/model_weight.hdf5" % self.modelpath
+        if not os.path.isfile(weight_path):
+            model.save_weights(weight_path)
+        model.save("%s/model.h5" % self.modelpath)
         model.save_weights("%s/model_weight.hdf5"% self.modelpath)
+
         model.save("%s/model.h5" % self.modelpath)
         if type == 'lstm_attention':
             self.saver = model
@@ -145,7 +163,7 @@ class Keras_ModelBuilder:
 
         res = [self.modelname, self.train_time, self.test_time, self.train_size, self.test_size, accuracy_score(true, pred), \
                precision_score(true, pred, average='weighted'),
-               recall_score(true, pred, average='weighted'), \
+               recall_score(true, pred, average='weighted'),
                f1_score(true, pred, average='weighted')]
         header = ["modelname", "train time", "test time", "train size", "test size", "Test accuracy", "Precision",
                   "Recall", "f1_score"]
@@ -177,6 +195,7 @@ class LossHistory(keras.callbacks.Callback):
 
     def loss_plot(self, loss_type, save_path):
         iters = range(len(self.losses[loss_type]))
+
         plt.figure()
         plt.plot(iters, self.accuracy[loss_type], 'r', label='train acc')
         plt.plot(iters, self.losses[loss_type], 'g', label='train loss')
@@ -184,6 +203,7 @@ class LossHistory(keras.callbacks.Callback):
             plt.plot(iters, self.val_acc[loss_type], 'b', label='val acc')
             plt.plot(iters, self.val_loss[loss_type], 'k', label='val loss')
         plt.grid(True)
+
         plt.xlabel(loss_type)
         plt.ylabel('acc-loss')
         plt.legend(loc="upper right")
@@ -193,7 +213,7 @@ class LossHistory(keras.callbacks.Callback):
 if __name__ == '__main__':
 
 
-    model = "har-vgg-lstm"
+    model = "authen-cnn-svm"
     path = "./model.conf"
     datasource, types, n_steps, n_channel, n_class, overlap, target, process_num, filter = config_parse(path)
     modelname_prefix = '_'.join(
@@ -207,8 +227,18 @@ if __name__ == '__main__':
     x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard=False)
 
     modelname = "%s#%s" % (model, modelname_prefix)
-    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=300, learning_rate=0.0001, epochs=50)
+    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=500, learning_rate=0.0001, epochs=300)
 
     modelbuild = Keras_ModelBuilder(modelconf, modelname, target)
-    modelbuild.train_vgg_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
-    modelbuild.test(x_test, y_test, 'vgg_lstm', ROC=False)
+    # modelbuild.train_cnn(x_train, y_train, x_valid, y_valid, figplot=True)
+    # modelbuild.test(x_test, y_test, 'vgg_lstm', ROC=False)
+
+    model = modelbuild.reload_cnn2svm()
+    cnn_prefix = Model(inputs=model.input, outputs = model.layers[-3].output)
+    cnn_prefix.summary()
+
+    x_test = np.array([d.T for d in x_test])
+    pred = cnn_prefix.predict(x_test)
+    print len(pred[0])
+
+

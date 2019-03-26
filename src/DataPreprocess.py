@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from utils.mysql_dump import dump_from_mysql
-from utils.sample import sample
+from utils.sample import sample,one_class_sample
 
 LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
 logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
@@ -293,8 +293,11 @@ class DataPreprocess:
         if target == 'binary':
 
             X,Y = sample(X,Y)
+        if target == 'one-class':
+            X,Y = one_class_sample(X,Y)
         Y = np.asarray(pd.get_dummies(np.array(Y)), dtype=np.int8)
         logging.info("Label has %d class"%Y[0].shape[0])
+
         assert Y[0].shape[0] == n_class
 
         return X, Y
