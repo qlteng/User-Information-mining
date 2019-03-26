@@ -27,6 +27,22 @@ def sample(X,Y):
     Y_ran = datay[RanSelf]
     return X_ran,Y_ran
 
+def one_class_sample(X,Y):
+    indexs = np.argwhere(Y == '0').T[0]
+
+    datax = []
+    datay = []
+    for index in indexs:
+        datax.append(X[index])
+        datay.append(Y[index])
+    datax = np.array(datax)
+    datay = np.array(datay)
+    RanSelf = np.random.permutation(datax.shape[0])
+    X_ran = datax[RanSelf]
+    Y_ran = datay[RanSelf]
+    return X_ran, Y_ran
+
+
 
 
 

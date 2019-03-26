@@ -6,12 +6,13 @@ import DataConf
 import DataPreprocess
 import ModelConf
 import ModelBuilder
+import os
 from utils.parse import config_parse
 
 LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
 logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
 
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '6'
 TerminalType = ["Logger+Wifi for Android;1.0", "NexusS", "Nexus"]
 TerminalPosition = ['arm','bag','waist','chest','']
 Activity = ['jog','skip','stay','stDown','stUp','walk']
@@ -28,7 +29,7 @@ def run(path):
     dataconf = DataConf.DataConf(datasource, types, n_steps, n_channel, n_class, float(overlap))
     process = DataPreprocess.DataPreprocess(dataconf, process_num, target, phonetype = filter['phonetype'], phoneposition = filter['phoneposition'], activity = filter['activity'])
 
-    x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard=False)
+    x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard=False,issample=False)
     # print y_train
     if len(y_train) == 0:
         return
@@ -43,7 +44,7 @@ def run(path):
     modelbuild.test(x_test, y_test, ROC=False)
     '''
     record = []
-    for model in ['cnn','vgglstm','vgg']:
+    for model in ['vgglstm']:
         p = multiprocessing.Process(target=para_train, args=(model, modelname_prefix, dataconf, target, x_train, y_train, x_valid, y_valid, x_test, y_test))
         p.start()
         record.append(p)
@@ -61,8 +62,8 @@ def para_train(model, modelname_prefix, dataconf, target, x_train, y_train, x_va
         modelbuild.test(x_test, y_test, ROC=False)
     elif model == 'vgglstm':
 
-        modelbuild.train_vgg_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
-        modelbuild.test(x_test, y_test, ROC=False)
+        modelbuild.train_vgg_lstm(x_train, y_train, x_valid, y_valid, figplot=False)
+        modelbuild.test(x_test, y_test, ROC=True)
     elif model == 'vgg':
 
         modelbuild.train_vgg(x_train, y_train, x_valid, y_valid, figplot=True)

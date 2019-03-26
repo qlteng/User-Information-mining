@@ -7,6 +7,7 @@ import pandas as pd
 import logging
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+from sklearn import svm
 import keras
 from keras.models import Model,Sequential
 from keras.layers import Input, Dense, LSTM, multiply, concatenate, Activation, Masking, Reshape, add,Flatten
@@ -45,7 +46,7 @@ class Keras_ModelBuilder:
         self.test_size = 10
         self.saver = None
 
-    def train_cnn(self, x_train, y_train, x_valid, y_valid, figplot = False):
+    def train_cnn(self, x_train, y_train, x_valid, y_valid, figplot = False, trainable = True):
         n_channel = self.conf.n_channels
         ip = Input(shape=(n_channel, self.conf.n_steps))
         y = Permute((2, 1))(ip)
@@ -61,36 +62,75 @@ class Keras_ModelBuilder:
         y = LSTM(32, return_sequences=False, name='lstm')(y)
         y = Dense(32, activation='sigmoid')(y)
         y = Dropout(0.5)(y)
-        out = Dense(self.conf.n_class, activation='softmax')(y)
+        out = None
+        if trainable:
+            out = Dense(self.conf.n_class, activation='softmax')(y)
+        else:
+            out = Dense(14, activation='softmax')(y)
         model = Model(ip, out)
-        # model.summary()
+        if trainable:
+            plot_model(model, to_file='model1.png', show_shapes=True)
+            self.run(model, x_train, y_train, x_valid, y_valid, None, "keras_cnn_lstm", figplot)
+        else:
+            # model.summary()
+            model.load_weights("%s/model_weight.hdf5" % self.modelpath)
+            model.trainable = False
+            prefix_cnn = Model(inputs=model.input, outputs=model.layers[-3].output)
+            self.train_svm(prefix_cnn,x_train,y_train,x_valid,y_valid)
 
-        plot_model(model, to_file='model1.png', show_shapes=True)
-        self.run(model, x_train, y_train, x_valid, y_valid, None, "keras_cnn_lstm", figplot)
+    def train_svm(self,model,x_train,y_train,x_valid,y_valid, ROC = True):
 
-    def reload_cnn2svm(self):
+        x_train = np.array([d.T for d in x_train])
+        x_valid = np.array([d.T for d in x_valid])
+        x_train = model.predict(x_train)
 
-        n_channel = self.conf.n_channels
-        ip = Input(shape=(n_channel, self.conf.n_steps))
-        y = Permute((2, 1))(ip)
-        y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        y = MaxPooling1D(pool_size=2, strides=2, padding='same')(y)
-        # y = BatchNormalization()(y)
-        # y = Activation('relu')(y)
-        y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
-        y = MaxPooling1D(pool_size=2, strides=2, padding='same')(y)
-        y = LSTM(32, return_sequences=False, name='lstm')(y)
-        y = Dense(32, activation='sigmoid')(y)
-        y = Dropout(0.5)(y)
-        out = Dense(self.conf.n_class, activation='softmax')(y)
-        model = Model(ip, out)
-        model.load_weights("%s/model_weight.hdf5" % self.modelpath)
-        model.trainable = False
+        x_valid = model.predict(x_valid)
+        clf = svm.OneClassSVM(nu=0.1, kernel="rbf", gamma=0.1)
+        clf.fit(x_train)
+        y_pred_test = clf.predict(x_valid)
+        y_true = []
+        y_valid = np.argmax(y_valid,axis=1)
+        for x in y_valid:
+            if x ==1:
+                y_true.append(-1)
+            else:
+                y_true.append(1)
+        print len(y_true)
+        print len(y_valid)
+        print"Test accuracy: {:.6f}".format(accuracy_score(y_true, y_pred_test))
+        print "confusion_matrix"
+        cf_matrix = confusion_matrix(y_true, y_pred_test)
+        print cf_matrix
 
+        y_problist = clf.decision_function(x_valid)
+        if ROC == True:
 
-        return model
+            y_prob = np.array(y_problist)
+            fpr, tpr, thresholds = roc_curve(y_true, y_prob)
+            FAR = 1 - tpr
+            FRR = fpr
+            res = abs(FAR - FRR)
+            EER_index = np.argwhere(res == min(res))
+            EER = (FRR[EER_index][0][0] + FAR[EER_index][0][0]) / 2
+            roc_auc = auc(fpr,tpr)
+            print "AUC",roc_auc
+            print "FRR", cf_matrix[1][0] / float(sum(cf_matrix[1]))
+            print "FAR", cf_matrix[0][1] / float(sum(cf_matrix[0]))
+            print "EER", EER
+
+            fpr = np.array(fpr)
+            tpr = np.array(tpr)
+            fpr = np.insert(fpr, 0, 0)
+            tpr = np.insert(tpr, 0 ,0)
+
+            plt.plot([0, 1], [0, 1], '--', color = (0.6, 0.6, 0.6))
+            plt.plot(fpr, tpr, 'b-')
+            plt.xlabel("False Positive Rate")
+            plt.ylabel("True Positiove Rate")
+            plt.title("ROC")
+            plt.legend(loc = "lower right")
+            plt.show()
+
 
     def run(self, model, x_train, y_train, x_valid, y_valid, cell, type, figplot = False):
 
@@ -151,9 +191,9 @@ class Keras_ModelBuilder:
         print "test size", self.test_size
 
         print"Test accuracy: {:.6f}".format(accuracy_score(true, pred))
-        print "Precision", precision_score(true, pred, average='weighted')
-        print "Recall", recall_score(true, pred, average='weighted')
-        print "f1_score", f1_score(true, pred, average='weighted')
+        print "Precision", precision_score(true, pred)
+        print "Recall", recall_score(true, pred)
+        print "f1_score", f1_score(true, pred)
         print "confusion_matrix"
         cf_matrix = confusion_matrix(true, pred)
 
@@ -220,25 +260,46 @@ if __name__ == '__main__':
         [datasource, n_steps, n_channel, n_class, overlap, target, filter['phonetype'], filter['phoneposition'],
          filter['activity']])
     n_steps, n_channel, n_class, process_num = map(lambda x: int(x), [n_steps, n_channel, n_class, process_num])
-    dataconf = DataConf.DataConf(datasource, types, n_steps, n_channel, n_class, float(overlap))
-    process = DataPreprocess.DataPreprocess(dataconf, process_num, target, phonetype=filter['phonetype'],
+
+    multi_dataconf = DataConf.DataConf(datasource, types, n_steps, n_channel, n_class, float(overlap))
+    multi_process = DataPreprocess.DataPreprocess(multi_dataconf, process_num, target, phonetype=filter['phonetype'],
+                                            phoneposition=filter['phoneposition'], activity=filter['activity'])
+    x_train1, y_train1, x_valid1, y_valid1, x_test1, y_test1 = multi_process.load_data(standard=False)
+
+    multi_modelname = "%s#%s" % (model, modelname_prefix)
+    multi_modelconf = ModelConf.ModelConf(dataconf=multi_dataconf, batch_size=500, learning_rate=0.0001, epochs=300)
+
+    multi_modelbuild = Keras_ModelBuilder(multi_modelconf, multi_modelname, target)
+    multi_modelbuild.train_cnn(x_train1, y_train1, x_valid1, y_valid1,figplot=True,trainable=True)
+    multi_modelbuild.test(x_test1, y_test1, 'vgg_lstm', ROC=False)
+
+    datasource, types, n_steps, n_channel, n_class, overlap, target, process_num, filter = config_parse(path)
+    target = 'binary'
+    n_class = '2'
+    n_steps, n_channel, n_class, process_num = map(lambda x: int(x), [n_steps, n_channel, n_class, process_num])
+    binary_dataconf = DataConf.DataConf(datasource, types, n_steps, n_channel, n_class, float(overlap))
+    binary_process = DataPreprocess.DataPreprocess(binary_dataconf, process_num, target, phonetype=filter['phonetype'],
                                             phoneposition=filter['phoneposition'], activity=filter['activity'])
 
-    x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard=False)
+    x_train2, y_train2, x_valid2, y_valid2, x_test2, y_test2 = binary_process.load_data(standard=False)
 
-    modelname = "%s#%s" % (model, modelname_prefix)
-    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=500, learning_rate=0.0001, epochs=300)
+    datasource, types, n_steps, n_channel, n_class, overlap, target, process_num, filter = config_parse(path)
+    target = 'one-class'
+    n_class = '1'
+    modelname_prefix = '_'.join(
+        [datasource, n_steps, n_channel, n_class, overlap, target, filter['phonetype'], filter['phoneposition'],
+         filter['activity']])
+    n_steps, n_channel, n_class, process_num = map(lambda x: int(x), [n_steps, n_channel, n_class, process_num])
+    one_dataconf = DataConf.DataConf(datasource, types, n_steps, n_channel, n_class, float(overlap))
+    one_process = DataPreprocess.DataPreprocess(one_dataconf, process_num, target, phonetype=filter['phonetype'],
+                                                  phoneposition=filter['phoneposition'], activity=filter['activity'])
+    x_train3, y_train3, x_valid3, y_valid3, x_test3, y_test3 = one_process.load_data(standard=False)
+    one_modelname = "%s#%s" % (model, modelname_prefix)
+    one_modelconf = ModelConf.ModelConf(dataconf=one_dataconf, batch_size=500, learning_rate=0.0001, epochs=1000)
 
-    modelbuild = Keras_ModelBuilder(modelconf, modelname, target)
-    # modelbuild.train_cnn(x_train, y_train, x_valid, y_valid, figplot=True)
-    # modelbuild.test(x_test, y_test, 'vgg_lstm', ROC=False)
+    one_modelbuild = Keras_ModelBuilder(one_modelconf, one_modelname, target)
 
-    model = modelbuild.reload_cnn2svm()
-    cnn_prefix = Model(inputs=model.input, outputs = model.layers[-3].output)
-    cnn_prefix.summary()
-
-    x_test = np.array([d.T for d in x_test])
-    pred = cnn_prefix.predict(x_test)
-    print len(pred[0])
+    one_modelbuild.modelpath = multi_modelbuild.modelpath
+    one_modelbuild.train_cnn(x_train3, y_train3, x_test2, y_test2, figplot=False, trainable=False)
 
 

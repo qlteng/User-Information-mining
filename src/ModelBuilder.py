@@ -418,12 +418,12 @@ class ModelBuilder:
             print "test size", self.test_size
 
             print"Test accuracy: {:.6f}".format(np.mean(test_acc))
-            print "Precision", precision_score(y_truelist, y_plist, average='weighted')
-            print "Recall", recall_score(y_truelist, y_plist, average='weighted')
-            print "f1_score", f1_score(y_truelist, y_plist, average='weighted')
+            print "Precision", precision_score(y_truelist, y_plist)
+            print "Recall", recall_score(y_truelist, y_plist)
+            print "f1_score", f1_score(y_truelist, y_plist)
             print "confusion_matrix"
             cf_matrix = confusion_matrix(y_truelist, y_plist)
-
+            print cf_matrix
             cf_matrix_path = "%s/cf.txt"%self.output
             cf_matrix = np.array(cf_matrix)
             np.savetxt(cf_matrix_path, cf_matrix, fmt = "%d")
@@ -450,8 +450,8 @@ class ModelBuilder:
                 EER = (FRR[EER_index][0][0] + FAR[EER_index][0][0]) / 2
                 roc_auc = auc(fpr,tpr)
                 print roc_auc
-                print "FRR", cf_matrix[1][0] / float(sum(cf_matrix[1]))
-                print "FAR", cf_matrix[0][1] / float(sum(cf_matrix[0]))
+                print "FAR", cf_matrix[1][0] / float(cf_matrix[0][1]+cf_matrix[1][1])
+                print "FRR", cf_matrix[0][1] / float(cf_matrix[0][0]+cf_matrix[1][0])
                 print "EER", EER
 
                 fpr = np.array(fpr)
