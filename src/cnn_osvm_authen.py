@@ -191,9 +191,9 @@ class Keras_ModelBuilder:
         print "test size", self.test_size
 
         print"Test accuracy: {:.6f}".format(accuracy_score(true, pred))
-        print "Precision", precision_score(true, pred)
-        print "Recall", recall_score(true, pred)
-        print "f1_score", f1_score(true, pred)
+        print "Precision", precision_score(true, pred,average='weighted')
+        print "Recall", recall_score(true, pred,average='weighted')
+        print "f1_score", f1_score(true, pred,average='weighted')
         print "confusion_matrix"
         cf_matrix = confusion_matrix(true, pred)
 
@@ -270,8 +270,8 @@ if __name__ == '__main__':
     multi_modelconf = ModelConf.ModelConf(dataconf=multi_dataconf, batch_size=500, learning_rate=0.0001, epochs=300)
 
     multi_modelbuild = Keras_ModelBuilder(multi_modelconf, multi_modelname, target)
-    multi_modelbuild.train_cnn(x_train1, y_train1, x_valid1, y_valid1,figplot=True,trainable=True)
-    multi_modelbuild.test(x_test1, y_test1, 'vgg_lstm', ROC=False)
+    # multi_modelbuild.train_cnn(x_train1, y_train1, x_valid1, y_valid1,figplot=True,trainable=True)
+    # multi_modelbuild.test(x_test1, y_test1, 'vgg_lstm', ROC=False)
 
     datasource, types, n_steps, n_channel, n_class, overlap, target, process_num, filter = config_parse(path)
     target = 'binary'
@@ -300,6 +300,6 @@ if __name__ == '__main__':
     one_modelbuild = Keras_ModelBuilder(one_modelconf, one_modelname, target)
 
     one_modelbuild.modelpath = multi_modelbuild.modelpath
-    one_modelbuild.train_cnn(x_train3, y_train3, x_test2, y_test2, figplot=False, trainable=False)
+    one_modelbuild.train_cnn(x_train3, y_train3, x_train2, y_train2, figplot=False, trainable=False)
 
 

@@ -27,7 +27,7 @@ class DataPreprocess:
         self.phoneposition = kwargs.get('phoneposition', '')
         self.activity = kwargs.get('activity', '')
 
-    def load_data(self, standard = True):
+    def load_data(self, standard = True,issample = True):
 
         global total_data
         global total_label
@@ -81,7 +81,7 @@ class DataPreprocess:
                 logging.info("Load split data from %s" % segment_data_path)
 
 
-            total_data, total_label= self.read_hasc(segment_data_path, self.df.n_channels, self.df.n_steps, self.target, self.df.types, self.df.n_class)
+            total_data, total_label= self.read_hasc(segment_data_path, self.df.n_channels, self.df.n_steps, self.target, self.df.types, self.df.n_class,issample)
             logging.info("Task type is %s and reset target is %s" % (self.df.types, self.target))
 
         RanSelf = np.random.permutation(total_data.shape[0])
@@ -122,7 +122,7 @@ class DataPreprocess:
             elif types == 'authen':
                 if target == 'multi':
                     label[i] = Person
-                elif target == 'binary':
+                elif target == 'binary' or target == 'one-class':
                     if Person == "person06010":
                         label[i] = int(0)
                     else:
@@ -274,7 +274,7 @@ class DataPreprocess:
         for process in record:
             process.join()
 
-    def read_hasc(self, data_path, n_channels, n_steps, target, types , n_class):
+    def read_hasc(self, data_path, n_channels, n_steps, target, types , n_class, issample = True):
 
         X = np.empty((0, n_steps, n_channels))
         Y = list()
@@ -291,11 +291,14 @@ class DataPreprocess:
 
         Y = np.array(Y)
         if target == 'binary':
+            if issample == True:
+                X,Y = sample(X,Y)
 
-            X,Y = sample(X,Y)
-        if target == 'one-class':
+        elif target == 'one-class':
             X,Y = one_class_sample(X,Y)
+
         Y = np.asarray(pd.get_dummies(np.array(Y)), dtype=np.int8)
+
         logging.info("Label has %d class"%Y[0].shape[0])
 
         assert Y[0].shape[0] == n_class
