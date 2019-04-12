@@ -50,6 +50,7 @@ class DataPreprocess:
                 raw_data_path = "../data/hasc/sport_simple_data"
             elif self.df.types == 'authen':
                 raw_data_path = "../data/hasc/human_data"
+                #raw_data_path = "../data/hasc/human_walk_onwaist_44_data"
 
             if not os.path.exists(raw_data_path):
                 logging.warning("Raw data path %s doesn't exist" % raw_data_path)
@@ -87,6 +88,7 @@ class DataPreprocess:
         RanSelf = np.random.permutation(total_data.shape[0])
         total_data = total_data[RanSelf]
         total_label = total_label[RanSelf]
+        print "total samples %d" %(len(total_label))
 
         #  split users as 1:1:3 for train、valid、test
         x_train, x_test, y_train, y_test = train_test_split(total_data, total_label, test_size = 0.20, random_state = 123)
@@ -196,13 +198,13 @@ class DataPreprocess:
             if activity != '' and activity != tempdict['activity']:
                 continue
 
-            if tempdict['type'] in ['Samsung;NexusS;AndroidOS 4.1;','Samsung;Nexus S;Android OS 4.1.2']:
-                tempdict['type'] = 'NexusS'
-            elif tempdict['type'] in ['Samsung;Galaxy Nexus;AndroidOS 4.1;','Samsung;Galaxy Nexus;Android OS 4.1.2',\
-                                      'SAMSUNG; Galaxy Nexus; Android 4.1.2']:
-                tempdict['type'] = 'Nexus'
-            if phonetype != '' and phonetype != tempdict['type']:
-                continue
+            # if tempdict['type'] in ['Samsung;NexusS;AndroidOS 4.1;','Samsung;Nexus S;Android OS 4.1.2']:
+            #     tempdict['type'] = 'NexusS'
+            # elif tempdict['type'] in ['Samsung;Galaxy Nexus;AndroidOS 4.1;','Samsung;Galaxy Nexus;Android OS 4.1.2',\
+            #                           'SAMSUNG; Galaxy Nexus; Android 4.1.2']:
+            #     tempdict['type'] = 'Nexus'
+            # if phonetype != '' and phonetype != tempdict['type']:
+            #     continue
 
             if tempdict['position'] in ['arm;hand','arm;left;hand','arm;right;hand','arm;left;wrist','arm;right;wrist']:
                 tempdict['position'] = 'arm'
@@ -211,15 +213,15 @@ class DataPreprocess:
                                           'bag;position(fixed);messengerbag','bag;position(fixed);shoulderbag']:
                 tempdict['position'] = 'bag'
 
-            elif tempdict['position'] in ['strap;waist;rear','waist','waist;left;pocket','wear;outer;waist;front', \
+            elif tempdict['position'] in ['strap;waist;rear','waist','waist;left;pocket','wear;outer;waist','wear;outer;waist;front','wear;outer;waist;right', \
                                           'wear;pants;waist;fit;right-back','wear;pants;front','wear;pants;waist;fit;left-front',\
                                           'wear;pants;waist;fit;right-front','wear;pants;waist;fit;rigtht-front',\
-                                          'wear;pants;waist;ruse;right-front']:
+                                          'wear;pants;waist;ruse;right-front','wear;pants;waist;ruse;left-front']:
                 tempdict['position'] = 'waist'
 
             elif tempdict['position'] in ['wear;outer;chest','wear;outer;chest;left']:
                 tempdict['position'] = 'chest'
-                
+
             if tempdict['position'] not in ['arm','bag','waist','chest']:
                 continue
             if phoneposition != '' and phoneposition != tempdict['position']:
@@ -336,4 +338,5 @@ class DataPreprocess:
         return X_train, X_test, X_vld
 
 
-
+if __name__ == '__main__':
+    pass

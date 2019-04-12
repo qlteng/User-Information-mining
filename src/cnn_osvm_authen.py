@@ -24,7 +24,7 @@ from keras.utils.vis_utils import plot_model
 
 LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
 logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
-os.environ['CUDA_VISIBLE_DEVICES'] = '7'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
 class Keras_ModelBuilder:
 
@@ -66,7 +66,7 @@ class Keras_ModelBuilder:
         if trainable:
             out = Dense(self.conf.n_class, activation='softmax')(y)
         else:
-            out = Dense(14, activation='softmax')(y)
+            out = Dense(44, activation='softmax')(y)
         model = Model(ip, out)
         if trainable:
             plot_model(model, to_file='model1.png', show_shapes=True)
@@ -270,8 +270,8 @@ if __name__ == '__main__':
     multi_modelconf = ModelConf.ModelConf(dataconf=multi_dataconf, batch_size=500, learning_rate=0.0001, epochs=300)
 
     multi_modelbuild = Keras_ModelBuilder(multi_modelconf, multi_modelname, target)
-    # multi_modelbuild.train_cnn(x_train1, y_train1, x_valid1, y_valid1,figplot=True,trainable=True)
-    # multi_modelbuild.test(x_test1, y_test1, 'vgg_lstm', ROC=False)
+    multi_modelbuild.train_cnn(x_train1, y_train1, x_valid1, y_valid1,figplot=True,trainable=True)
+    multi_modelbuild.test(x_test1, y_test1, 'vgg_lstm', ROC=False)
 
     datasource, types, n_steps, n_channel, n_class, overlap, target, process_num, filter = config_parse(path)
     target = 'binary'
