@@ -204,7 +204,7 @@ class LossHistory(keras.callbacks.Callback):
         plt.xlabel(loss_type)
         plt.ylabel('acc-loss')
         plt.legend(loc="upper right")
-        plt.savefig("%s/acc-loss.jpg" % save_path)
+        plt.savefig("%s/acc-loss.svg" % save_path)
         plt.show()
 
 if __name__ == '__main__':

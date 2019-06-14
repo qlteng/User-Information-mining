@@ -22,6 +22,7 @@ from keras.utils.vis_utils import plot_model
 
 LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
 logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
+os.environ['CUDA_VISIBLE_DEVICES'] = '7'
 
 class Keras_ModelBuilder:
 
@@ -95,31 +96,30 @@ class Keras_ModelBuilder:
         y = Permute((2, 1))(ip)
         y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
         y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
+        # y = Conv1D(2 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
         y = MaxPooling1D(pool_size=2, strides=2, padding='same')(y)
-        y = BatchNormalization()(y)
-        y = Activation('relu')(y)
+        # y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
+        #y = BatchNormalization()(y)
+        #y = Activation('relu')(y)
         y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
         y = Conv1D(4 * n_channel, 5, padding='same', activation='relu', kernel_initializer='he_uniform')(y)
         y = MaxPooling1D(pool_size=2, strides=2, padding='same')(y)
-        y = BatchNormalization()(y)
-        y = Activation('relu')(y)
-        # y = self.squeeze_excite_block(y)
-        n_ch = 4 * n_channel
-        # inner = Reshape(target_shape = ((-1 , n_ch)))(y)
-        y = Permute((2,1))(y)
-        y = LSTM(32, return_sequences= True)(y)
-        y = Dropout(0.5)(y)
+        #y = BatchNormalization()(y)
+        #y = Activation('relu')(y)
+
+        # y = LSTM(32, return_sequences= True)(y)
+        # y = Dropout(0.5)(y)
         y = LSTM(32, return_sequences= False)(y)
         # lstm1 = LSTM(32, kernel_initializer='he_normal')(inner)
         # lstm2 = LSTM(32, go_backwards=True, kernel_initializer='he_normal')(inner)
         # lstm_merged = add([lstm1, lstm2])
         # lstm_merged = BatchNormalization()(lstm_merged)
-
+        y = Dense(32, activation='sigmoid')(y)
         out = Dense(self.conf.n_class, activation='sigmoid')(y)
         model = Model(ip, out)
         model.summary()
 
-        plot_model(model, to_file='model1.png', show_shapes=True)
+        # plot_model(model, to_file='model1.png', show_shapes=True)
         self.run(model, x_train, y_train, x_valid, y_valid, None, "keras_cnn_lstm", figplot)
 
     def train_lstm_attention(self, x_train, y_train, x_valid, y_valid, figplot = False):
@@ -215,9 +215,9 @@ class Keras_ModelBuilder:
         print "test size", self.test_size
 
         print"Test accuracy: {:.6f}".format(accuracy_score(true, pred))
-        print "Precision", precision_score(true, pred, average='weighted')
-        print "Recall", recall_score(true, pred, average='weighted')
-        print "f1_score", f1_score(true, pred, average='weighted')
+        print "Precision", precision_score(true, pred, average='micro')
+        print "Recall", recall_score(true, pred, average='micro')
+        print "f1_score", f1_score(true, pred, average='micro')
         print "confusion_matrix"
         cf_matrix = confusion_matrix(true, pred)
 
@@ -226,9 +226,9 @@ class Keras_ModelBuilder:
         np.savetxt(cf_matrix_path, cf_matrix, fmt="%d")
 
         res = [self.modelname, self.train_time, self.test_time, self.train_size, self.test_size, accuracy_score(true, pred), \
-               precision_score(true, pred, average='weighted'),
-               recall_score(true, pred, average='weighted'), \
-               f1_score(true, pred, average='weighted')]
+               precision_score(true, pred, average='micro'),
+               recall_score(true, pred, average='micro'), \
+               f1_score(true, pred, average='micro')]
         header = ["modelname", "train time", "test time", "train size", "test size", "Test accuracy", "Precision",
                   "Recall", "f1_score"]
         res_csv = "../output/%s/%s/res.csv" % (self.types, self.target)
@@ -275,7 +275,7 @@ class LossHistory(keras.callbacks.Callback):
 if __name__ == '__main__':
 
 
-    model = "Keras-CNN"
+    model = ""
     path = "./model.conf"
     datasource, types, n_steps, n_channel, n_class, overlap, target, process_num, filter = config_parse(path)
     modelname_prefix = '_'.join(
@@ -289,28 +289,7 @@ if __name__ == '__main__':
     x_train, y_train, x_valid, y_valid, x_test, y_test = process.load_data(standard=False)
 
     modelname = "%s#%s" % (model, modelname_prefix)
-    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=300, learning_rate=0.0001, epochs=200)
+    modelconf = ModelConf.ModelConf(dataconf=dataconf, batch_size=200, learning_rate=0.0005, epochs=70)
     modelbuild = Keras_ModelBuilder(modelconf, modelname, target)
     modelbuild.train_vgg_lstm(x_train, y_train, x_valid, y_valid, figplot=True)
     modelbuild.test(x_test, y_test, 'vgg_lstm', ROC=False)
-    #
-    # ip = Input(shape=(6, 256))
-    # x = AttentionLSTM(32)(ip)
-    # x = Dropout(0.8)(x)
-    # out = Dense(6, activation='softmax')(x)
-    # model = Model(ip, out)
-    # x_train = np.array([d.T for d in x_train])
-    # x_valid = np.array([d.T for d in x_valid])
-    # x_test = np.array([d.T for d in x_test])
-    # optm = Adam(lr=1e-3)
-    # model.compile(optimizer=optm, loss='categorical_crossentropy', metrics=['accuracy'])
-    # history = LossHistory()
-    # model.fit(x_train, y_train,
-    #           batch_size=600,
-    #           epochs=10,
-    #           verbose=0,
-    #           validation_data=(x_valid, y_valid),
-    #           callbacks=[history])
-    # pred = model.predict(x_test)
-    # print [x.argmax() for x in pred]
-

@@ -24,7 +24,7 @@ from keras.utils.vis_utils import plot_model
 
 LOG_FORMAT = '%(asctime)s %(filename)s[line:%(lineno)d] %(levelname)s %(message)s'
 logging.basicConfig(level=logging.DEBUG, format=LOG_FORMAT)
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '4'
 
 class Keras_ModelBuilder:
 
@@ -66,7 +66,7 @@ class Keras_ModelBuilder:
         if trainable:
             out = Dense(self.conf.n_class, activation='softmax')(y)
         else:
-            out = Dense(44, activation='softmax')(y)
+            out = Dense(1, activation='softmax')(y)
         model = Model(ip, out)
         if trainable:
             plot_model(model, to_file='model1.png', show_shapes=True)
